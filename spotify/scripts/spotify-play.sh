@@ -12,7 +12,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SPOTIFY_DIR="$HOME/.spotify"
+SPOTIFY_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/spotify"
 CONFIG_FILE="$SPOTIFY_DIR/config.json"
 
 # Colors

@@ -111,8 +111,9 @@ ensure_token_dir() {
     chmod 700 "$SPOTIFY_DIR"
 }
 
+# URL encode using jq
 url_encode() {
-    python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))" <<< "$1"
+    printf '%s' "$1" | jq -sRr @uri
 }
 
 generate_random_string() {

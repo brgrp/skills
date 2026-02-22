@@ -8,22 +8,77 @@ description: |
 
 # Spotify Control
 
+## Agent Workflow
+
+### Playing Music
+
+Use the two-step search → play workflow:
+
+```bash
+# Step 1: Search (returns JSON)
+./scripts/spotify-play.sh search "bohemian rhapsody" --type track
+```
+
+**Response types:**
+
+1. **Clean match** (`"match": "auto"`) - Already playing, done!
+```json
+{"query":"bohemian rhapsody","type":"track","match":"auto",
+ "playing":{"name":"Bohemian Rhapsody","artist":"Queen","uri":"spotify:track:xxx"},
+ "results":[...]}
+```
+
+2. **Unclear match** (`"match": "unclear"`) - Review results, pick best one:
+```json
+{"query":"rock classics","type":"playlist","match":"unclear",
+ "results":[
+   {"name":"Rock Classics","owner":"Spotify","uri":"spotify:playlist:xxx"},
+   {"name":"Classic Rock Hits","owner":"Someone","uri":"spotify:playlist:yyy"}
+ ]}
+```
+Then call:
+```bash
+./scripts/spotify-play.sh play "spotify:playlist:xxx"
+```
+
+3. **No results** (`"match": "none"`) - Tell user nothing found
+
+### Decision Rules
+
+When `match` is `"unclear"`:
+1. Review the `results` array
+2. Pick the best match based on name similarity to original query
+3. If genuinely ambiguous, ask the user which one they want
+4. Call `play` with the chosen URI
+
 ## Quick Start
 
 ```bash
-# Play a song (handles search, device wake, everything)
-./scripts/spotify-play.sh "l'amour toujours"
+# Search and play (auto-plays if clean match)
+./scripts/spotify-play.sh search "bohemian rhapsody"
 
-# Play a playlist
-./scripts/spotify-play.sh "today's top hits" --type playlist
+# Play specific URI
+./scripts/spotify-play.sh play "spotify:track:4u7EnebtmKWzUH433cf5Qv"
 
-# Pause/resume/skip
+# Playback controls
 ./scripts/spotify-ctl.sh pause
 ./scripts/spotify-ctl.sh play
 ./scripts/spotify-ctl.sh next
 ```
 
 ## Setup
+
+### Dependencies
+
+Requires `jq` for JSON processing. Other tools are built-in on macOS/Linux.
+
+```bash
+# macOS
+brew install jq
+
+# Linux (Debian/Ubuntu)
+sudo apt install jq
+```
 
 ### Spotify Developer Account (one-time)
 
@@ -37,42 +92,30 @@ description: |
 
 ### First Run
 
-First run prompts for credentials interactively:
 ```bash
 ./scripts/spotify-auth.sh login
 ```
 
-Credentials loaded from: env vars → `~/.spotify/credentials.json` → interactive prompt
+Credentials loaded from: env vars → `~/.config/spotify/credentials.json` → interactive prompt
 
-## Helper Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `spotify-play.sh <query>` | Search and play (handles device wake) |
-| `spotify-ctl.sh <cmd>` | Playback control (pause, play, next, prev, volume, shuffle, repeat) |
-| `spotify-auth.sh login` | OAuth setup |
-| `spotify-auth.sh token` | Get valid token (auto-refreshes) |
+## Commands
 
 ### spotify-play.sh
 
 ```bash
-# Play track (default)
-./scripts/spotify-play.sh "bohemian rhapsody"
+# Search (returns JSON, auto-plays if clean match)
+./scripts/spotify-play.sh search "song name"
+./scripts/spotify-play.sh search "playlist name" --type playlist
+./scripts/spotify-play.sh search "artist" --type artist
+./scripts/spotify-play.sh search "album" --type album
 
-# Play playlist
-./scripts/spotify-play.sh "workout" --type playlist
+# Play specific URI
+./scripts/spotify-play.sh play "spotify:track:xxx"
+./scripts/spotify-play.sh play "spotify:playlist:xxx" --device "Kitchen Echo"
 
-# Play album  
-./scripts/spotify-play.sh "thriller" --type album
-
-# Play artist
-./scripts/spotify-play.sh "queen" --type artist
-
-# Play on specific device
-./scripts/spotify-play.sh "song" --device "Kitchen Echo"
-
-# Set default device
-./scripts/spotify-play.sh --set-device "Kitchen Echo"
+# Device management
+./scripts/spotify-play.sh --devices              # List devices (JSON)
+./scripts/spotify-play.sh --set-device "Echo"    # Set default device
 ```
 
 ### spotify-ctl.sh
@@ -85,48 +128,11 @@ Credentials loaded from: env vars → `~/.spotify/credentials.json` → interact
 ./scripts/spotify-ctl.sh volume 50
 ./scripts/spotify-ctl.sh shuffle on|off
 ./scripts/spotify-ctl.sh repeat track|context|off
-./scripts/spotify-ctl.sh devices        # list devices
-./scripts/spotify-ctl.sh transfer Echo  # move playback to device
-./scripts/spotify-ctl.sh now            # what's playing
-./scripts/spotify-ctl.sh queue          # show queue
-./scripts/spotify-ctl.sh add-queue <uri> # add to queue
-```
-
-## Direct API Access
-
-For advanced use, get token and call API directly:
-
-```bash
-TOKEN=$(./scripts/spotify-auth.sh token)
-
-# Search
-curl -s "https://api.spotify.com/v1/search?q=despacito&type=track&limit=5" \
-  -H "Authorization: Bearer $TOKEN" | jq '.tracks.items[] | {name, uri}'
-
-# Play URI
-curl -s -X PUT "https://api.spotify.com/v1/me/player/play" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"uris": ["spotify:track:xxx"]}'
-```
-
-## Common Patterns
-
-### Search and play first result
-```bash
-./scripts/spotify-play.sh "song name"
-```
-
-### Play on specific device
-```bash
-./scripts/spotify-play.sh "song" --device "Echo"
-```
-
-### Control playback
-```bash
-./scripts/spotify-ctl.sh pause
-./scripts/spotify-ctl.sh volume 30
-./scripts/spotify-ctl.sh shuffle on
+./scripts/spotify-ctl.sh devices        # List devices
+./scripts/spotify-ctl.sh transfer Echo  # Move playback to device
+./scripts/spotify-ctl.sh now            # What's playing
+./scripts/spotify-ctl.sh queue          # Show queue
+./scripts/spotify-ctl.sh add-queue <uri>
 ```
 
 ## Error Handling
@@ -134,21 +140,35 @@ curl -s -X PUT "https://api.spotify.com/v1/me/player/play" \
 | Error | Solution |
 |-------|----------|
 | No token | Run `./scripts/spotify-auth.sh login` |
-| No active device | Script auto-wakes default device, or use `--device` |
+| No active device | Use `--device` flag or `--set-device` |
 | 403 Premium required | Playback needs Spotify Premium |
-| 401 Unauthorized | Token auto-refreshes; if persists, re-run login |
+| 401 Unauthorized | Re-run `./scripts/spotify-auth.sh login` |
 
 ## Files
 
 ```
-~/.config/spotify/          # or $XDG_CONFIG_HOME/spotify/
-├── credentials.json        # Client ID/Secret (chmod 600)
-├── tokens.json             # Access/refresh tokens (chmod 600)  
-└── config.json             # Default device, preferences
+~/.config/spotify/           # or $XDG_CONFIG_HOME/spotify/
+├── credentials.json         # Client ID/Secret (chmod 600)
+├── tokens.json              # Access/refresh tokens (chmod 600)
+└── config.json              # Default device, preferences
 ```
 
-## API Limits (Feb 2026)
+## Security
 
-- Search: max 10 results per request
-- Batch endpoints removed (fetch individually)
-- Normalize playlist URIs: `playlist_v2` → `playlist`
+### Credential Storage
+
+All sensitive files stored with restricted permissions:
+- Directory: `chmod 700`
+- Files: `chmod 600`
+
+### Input Validation
+
+- **Spotify URIs**: Must match `spotify:<type>:<base62id>` pattern
+- **Device IDs**: Validated as 40-char hex or UUID_amzn_N format
+- **JSON payloads**: Constructed using `jq` to prevent injection
+
+### API Data Handling
+
+- Search results returned as structured JSON for agent review
+- Agent makes semantic decisions about result relevance
+- All untrusted API data validated before use in subsequent requests

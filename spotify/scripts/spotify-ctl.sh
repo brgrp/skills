@@ -24,6 +24,17 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 
+# Validate Spotify device ID format
+# - Standard: 40-char hex (Spotify native devices)
+# - Amazon: UUID_amzn_N format (Echo devices)
+validate_device_id() {
+    local id="$1"
+    if [[ "$id" =~ ^[a-fA-F0-9]{40}$ ]] || [[ "$id" =~ ^[a-f0-9-]{36}_amzn_[0-9]+$ ]]; then
+        return 0
+    fi
+    return 1
+}
+
 # Cached token
 _TOKEN=""
 get_token() {
@@ -172,8 +183,9 @@ case "${1:-}" in
             log_error "Usage: $0 add-queue <spotify:track:xxx>"
             exit 1
         fi
-        if [[ ! "$2" =~ ^spotify:(track|episode): ]]; then
-            log_error "Invalid URI. Must be spotify:track:xxx or spotify:episode:xxx"
+        # Validate URI format strictly: spotify:(track|episode):<base62id>
+        if [[ ! "$2" =~ ^spotify:(track|episode):[a-zA-Z0-9]+$ ]]; then
+            log_error "Invalid URI. Must be spotify:track:<id> or spotify:episode:<id>"
             exit 1
         fi
         api POST "/me/player/queue?uri=$2" && log_info "Added to queue"
@@ -203,7 +215,14 @@ case "${1:-}" in
             echo "$devices_json" | jq -r '.devices[]? | "  - \(.name)"'
             exit 1
         fi
-        api PUT "/me/player" "{\"device_ids\": [\"$device_id\"], \"play\": true}" > /dev/null && log_info "Transferred to $2"
+        # Validate device ID format (untrusted API data)
+        if ! validate_device_id "$device_id"; then
+            log_error "Invalid device ID format from API"
+            exit 1
+        fi
+        # Use jq for safe JSON construction (sanitizes untrusted API data)
+        transfer_body=$(jq -n --arg id "$device_id" '{"device_ids": [$id], "play": true}')
+        api PUT "/me/player" "$transfer_body" > /dev/null && log_info "Transferred to $2"
         ;;
     -h|--help|"")
         echo "Spotify Control"

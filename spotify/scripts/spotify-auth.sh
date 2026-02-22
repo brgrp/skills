@@ -131,13 +131,9 @@ get_auth_url() {
 exchange_code() {
     local code="$1"
     
-    # Use stdin to avoid secrets in process list
     local response=$(curl -s -X POST "https://accounts.spotify.com/api/token" \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        --data-binary @- <<EOF
-grant_type=authorization_code&code=$code&redirect_uri=$REDIRECT_URI&client_id=$SPOTIFY_CLIENT_ID&client_secret=$SPOTIFY_CLIENT_SECRET
-EOF
-    )
+        -d "grant_type=authorization_code&code=$code&redirect_uri=$REDIRECT_URI&client_id=$SPOTIFY_CLIENT_ID&client_secret=$SPOTIFY_CLIENT_SECRET")
     
     if echo "$response" | jq -e '.access_token' > /dev/null 2>&1; then
         local access_token=$(echo "$response" | jq -r '.access_token')
@@ -175,13 +171,9 @@ refresh_token() {
         return 1
     fi
     
-    # Use stdin to avoid secrets in process list
     local response=$(curl -s -X POST "https://accounts.spotify.com/api/token" \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        --data-binary @- <<EOF
-grant_type=refresh_token&refresh_token=$refresh&client_id=$SPOTIFY_CLIENT_ID&client_secret=$SPOTIFY_CLIENT_SECRET
-EOF
-    )
+        -d "grant_type=refresh_token&refresh_token=$refresh&client_id=$SPOTIFY_CLIENT_ID&client_secret=$SPOTIFY_CLIENT_SECRET")
     
     if echo "$response" | jq -e '.access_token' > /dev/null 2>&1; then
         local access_token=$(echo "$response" | jq -r '.access_token')

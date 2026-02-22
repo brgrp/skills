@@ -16,9 +16,10 @@
 set -e
 
 # Configuration
-SPOTIFY_DIR="$HOME/.spotify"
+SPOTIFY_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/spotify"
 TOKEN_FILE="$SPOTIFY_DIR/tokens.json"
 CREDENTIALS_FILE="$SPOTIFY_DIR/credentials.json"
+STATE_FILE="$SPOTIFY_DIR/.oauth_state"
 REDIRECT_URI="http://127.0.0.1:17823/callback"
 SCOPES="user-read-playback-state user-modify-playback-state user-read-currently-playing user-read-private playlist-read-private user-library-read"
 
@@ -118,11 +119,15 @@ generate_random_string() {
     openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 16
 }
 
-# Get authorization URL
+# Get authorization URL and save state for CSRF validation
 get_auth_url() {
     local state=$(generate_random_string)
     local encoded_scopes=$(url_encode "$SCOPES")
     local encoded_redirect=$(url_encode "$REDIRECT_URI")
+    
+    # Save state for validation on callback
+    echo "$state" > "$STATE_FILE"
+    chmod 600 "$STATE_FILE"
     
     echo "https://accounts.spotify.com/authorize?response_type=code&client_id=$SPOTIFY_CLIENT_ID&scope=$encoded_scopes&redirect_uri=$encoded_redirect&state=$state"
 }
@@ -279,6 +284,7 @@ do_login() {
     # Using netcat for simplicity
     local response=""
     local code=""
+    local returned_state=""
     
     while true; do
         # Listen for one connection
@@ -287,6 +293,7 @@ do_login() {
         # Extract code from request
         if echo "$response" | grep -q "code="; then
             code=$(echo "$response" | sed -n 's/.*code=\([^& ]*\).*/\1/p')
+            returned_state=$(echo "$response" | sed -n 's/.*state=\([^& ]*\).*/\1/p')
             break
         fi
         
@@ -297,6 +304,20 @@ do_login() {
             return 1
         fi
     done
+    
+    # Validate state to prevent CSRF attacks
+    if [ -f "$STATE_FILE" ]; then
+        local expected_state=$(cat "$STATE_FILE")
+        rm -f "$STATE_FILE"
+        
+        if [ "$returned_state" != "$expected_state" ]; then
+            log_error "State mismatch - possible CSRF attack"
+            return 1
+        fi
+    else
+        log_error "No state file found - cannot validate callback"
+        return 1
+    fi
     
     if [ -n "$code" ]; then
         log_info "Got authorization code, exchanging for tokens..."

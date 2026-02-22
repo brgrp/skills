@@ -141,10 +141,10 @@ curl -s -X PUT "https://api.spotify.com/v1/me/player/play" \
 ## Files
 
 ```
-~/.spotify/
-├── credentials.json  # Client ID/Secret (chmod 600)
-├── tokens.json       # Access/refresh tokens (chmod 600)  
-└── config.json       # Default device, preferences
+~/.config/spotify/          # or $XDG_CONFIG_HOME/spotify/
+├── credentials.json        # Client ID/Secret (chmod 600)
+├── tokens.json             # Access/refresh tokens (chmod 600)  
+└── config.json             # Default device, preferences
 ```
 
 ## API Limits (Feb 2026)

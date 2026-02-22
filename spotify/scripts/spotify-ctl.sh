@@ -89,16 +89,16 @@ api() {
 
 case "${1:-}" in
     pause)
-        api PUT "/me/player/pause" && log_info "Paused"
+        api PUT "/me/player/pause" > /dev/null && log_info "Paused"
         ;;
     play|resume)
-        api PUT "/me/player/play" && log_info "Playing"
+        api PUT "/me/player/play" > /dev/null && log_info "Playing"
         ;;
     next|skip)
-        api POST "/me/player/next" && log_info "Skipped to next"
+        api POST "/me/player/next" > /dev/null && log_info "Skipped to next"
         ;;
     prev|previous)
-        api POST "/me/player/previous" && log_info "Back to previous"
+        api POST "/me/player/previous" > /dev/null && log_info "Back to previous"
         ;;
     volume|vol)
         if [ -z "$2" ]; then
@@ -109,7 +109,7 @@ case "${1:-}" in
             log_error "Volume must be a number between 0-100"
             exit 1
         fi
-        api PUT "/me/player/volume?volume_percent=$2" && log_info "Volume set to $2%"
+        api PUT "/me/player/volume?volume_percent=$2" > /dev/null && log_info "Volume set to $2%"
         ;;
     shuffle)
         if [ -z "$2" ]; then
@@ -117,8 +117,8 @@ case "${1:-}" in
             exit 1
         fi
         case "$2" in
-            on)  api PUT "/me/player/shuffle?state=true" && log_info "Shuffle on" ;;
-            off) api PUT "/me/player/shuffle?state=false" && log_info "Shuffle off" ;;
+            on)  api PUT "/me/player/shuffle?state=true" > /dev/null && log_info "Shuffle on" ;;
+            off) api PUT "/me/player/shuffle?state=false" > /dev/null && log_info "Shuffle off" ;;
             *)   log_error "Invalid value '$2'. Use: on or off"; exit 1 ;;
         esac
         ;;
@@ -129,7 +129,7 @@ case "${1:-}" in
         fi
         case "$2" in
             track|context|off)
-                api PUT "/me/player/repeat?state=$2" && log_info "Repeat: $2"
+                api PUT "/me/player/repeat?state=$2" > /dev/null && log_info "Repeat: $2"
                 ;;
             *)
                 log_error "Invalid mode '$2'. Use: track, context, or off"
@@ -203,7 +203,7 @@ case "${1:-}" in
             echo "$devices_json" | jq -r '.devices[]? | "  - \(.name)"'
             exit 1
         fi
-        api PUT "/me/player" "{\"device_ids\": [\"$device_id\"], \"play\": true}" && log_info "Transferred to $2"
+        api PUT "/me/player" "{\"device_ids\": [\"$device_id\"], \"play\": true}" > /dev/null && log_info "Transferred to $2"
         ;;
     -h|--help|"")
         echo "Spotify Control"

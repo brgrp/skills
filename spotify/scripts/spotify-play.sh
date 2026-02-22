@@ -74,7 +74,6 @@ api_call() {
                 ;;
             404)
                 # Return 404 for caller to handle (device wake)
-                echo "$body"
                 return 44  # Special code for 404
                 ;;
             *)

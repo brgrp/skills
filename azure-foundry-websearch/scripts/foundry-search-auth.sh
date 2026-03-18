@@ -8,7 +8,7 @@
 #
 # Configuration Priority:
 #   1. Environment variables (if set)
-#   2. Config file (~/.config/azure-foundry-search/config.json)
+#   2. Config file (~/.config/azure-foundry-websearch/config.json)
 #
 # Environment Variables (optional, override config file):
 #   AZURE_FOUNDRY_ENDPOINT   - Azure AI Services endpoint
@@ -18,7 +18,7 @@
 set -e
 
 # Config directory and file
-FOUNDRY_SEARCH_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/azure-foundry-search"
+FOUNDRY_SEARCH_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/azure-foundry-websearch"
 CONFIG_FILE="$FOUNDRY_SEARCH_DIR/config.json"
 
 # Configuration (loaded from env or file)
@@ -525,7 +525,7 @@ Commands:
   show       - Show current configuration
 
 Configuration:
-  Config file: ~/.config/azure-foundry-search/config.json
+  Config file: ~/.config/azure-foundry-websearch/config.json
   Permissions: Directory 700, File 600
   
   Environment variables (optional, override config file):

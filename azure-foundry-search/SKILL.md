@@ -6,7 +6,7 @@ description: |
   verifying current facts, "what's the latest on X", any information that may have changed recently.
   DO NOT USE FOR: Historical facts, timeless knowledge, code documentation, internal data queries.
 metadata:
-  version: "2.3.0"
+  version: "0.1"
 ---
 
 # Azure AI Foundry Search

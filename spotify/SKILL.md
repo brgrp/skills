@@ -4,6 +4,8 @@ description: |
   Control Spotify playback via CLI. Requires Spotify Premium for playback control.
   USE FOR: play song, play music, play [song name], play [artist], play [album], play [playlist], pause, stop music, resume, skip, next song, previous song, what's playing, now playing, current song, volume up, volume down, set volume, shuffle on, shuffle off, repeat, queue, add to queue, list devices, transfer playback, play on [device].
   DO NOT USE FOR: downloading music, editing playlists, creating playlists.
+metadata:
+  version: "0.3"
 ---
 
 # Spotify Control

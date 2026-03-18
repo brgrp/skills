@@ -11,12 +11,12 @@
 #
 # Configuration Priority:
 #   1. Environment variables (if set)
-#   2. Config file (~/.config/azure-foundry-search/config.json)
+#   2. Config file (~/.config/azure-foundry-websearch/config.json)
 
 set -e
 
 # Config directory and file
-FOUNDRY_SEARCH_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/azure-foundry-search"
+FOUNDRY_SEARCH_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/azure-foundry-websearch"
 CONFIG_FILE="$FOUNDRY_SEARCH_DIR/config.json"
 
 # Configuration (loaded from env or file)
@@ -386,7 +386,7 @@ Options:
 
 Configuration:
   Run ./foundry-search.sh configure to set up credentials.
-  Config file: ~/.config/azure-foundry-search/config.json
+  Config file: ~/.config/azure-foundry-websearch/config.json
 
 This is the low-level API script. Use foundry-search.sh instead.
 EOF

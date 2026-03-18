@@ -11,7 +11,7 @@
 #   foundry-search show                        Show current config
 #
 # Configuration:
-#   Config file: ~/.config/azure-foundry-search/config.json
+#   Config file: ~/.config/azure-foundry-websearch/config.json
 #   Run 'configure' for first-time setup
 #
 # Exit Codes:
@@ -107,7 +107,7 @@ Response Format (JSON):
   status=no_results -> try rephrasing the query
 
 Configuration:
-  Config file: ~/.config/azure-foundry-search/config.json
+  Config file: ~/.config/azure-foundry-websearch/config.json
   Permissions: Directory 700, File 600
 
   First-time setup:

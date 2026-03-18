@@ -1,15 +1,15 @@
 ---
-name: azure-foundry-search
+name: azure-foundry-websearch
 description: |
   Real-time web search using Azure AI Foundry's Responses API with Grounding with Bing.
   USE FOR: Current events, recent news, latest prices, weather, stock quotes, recent releases, 
   verifying current facts, "what's the latest on X", any information that may have changed recently.
   DO NOT USE FOR: Historical facts, timeless knowledge, code documentation, internal data queries.
 metadata:
-  version: "0.1"
+  version: "1.0.0"
 ---
 
-# Azure AI Foundry Search
+# Azure AI Foundry Web Search
 
 Search the web for current information using Azure AI Foundry's Responses API with Grounding with Bing.
 
@@ -17,17 +17,17 @@ Search the web for current information using Azure AI Foundry's Responses API wi
 
 1. **Check configuration** before first use:
    ```bash
-   ./azure-foundry-search/scripts/foundry-search.sh status
+   ./azure-foundry-websearch/scripts/foundry-search.sh status
    ```
    
    If not configured, run:
    ```bash
-   ./azure-foundry-search/scripts/foundry-search.sh configure
+   ./azure-foundry-websearch/scripts/foundry-search.sh configure
    ```
 
 2. **Run web searches** with the search command:
    ```bash
-   ./azure-foundry-search/scripts/foundry-search.sh search "your question here"
+   ./azure-foundry-websearch/scripts/foundry-search.sh search "your question here"
    ```
 
 3. **Parse the JSON response**:
@@ -41,13 +41,13 @@ Search the web for current information using Azure AI Foundry's Responses API wi
 
 ```bash
 # First-time setup (interactive)
-./azure-foundry-search/scripts/foundry-search.sh configure
+./azure-foundry-websearch/scripts/foundry-search.sh configure
 
 # Check configuration
-./azure-foundry-search/scripts/foundry-search.sh status
+./azure-foundry-websearch/scripts/foundry-search.sh status
 
 # Search the web
-./azure-foundry-search/scripts/foundry-search.sh search "latest technology news"
+./azure-foundry-websearch/scripts/foundry-search.sh search "latest technology news"
 ```
 
 ## Commands
@@ -56,44 +56,44 @@ Search the web for current information using Azure AI Foundry's Responses API wi
 
 ```bash
 # Interactive setup - prompts for endpoint, API key, and model
-./azure-foundry-search/scripts/foundry-search.sh configure
+./azure-foundry-websearch/scripts/foundry-search.sh configure
 ```
 
-This saves credentials securely to `~/.config/azure-foundry-search/config.json` with restricted permissions.
+This saves credentials securely to `~/.config/azure-foundry-websearch/config.json` with restricted permissions.
 
 ### Search
 
 ```bash
 # Basic web search
-./azure-foundry-search/scripts/foundry-search.sh search "your query"
+./azure-foundry-websearch/scripts/foundry-search.sh search "your query"
 
 # With regional context (localizes results)
-./azure-foundry-search/scripts/foundry-search.sh search "local news" --country US
+./azure-foundry-websearch/scripts/foundry-search.sh search "local news" --country US
 
 # High context (more detailed search)
-./azure-foundry-search/scripts/foundry-search.sh search "explain topic" --context high
+./azure-foundry-websearch/scripts/foundry-search.sh search "explain topic" --context high
 
 # Low context (faster, less detailed)
-./azure-foundry-search/scripts/foundry-search.sh search "current date" --context low
+./azure-foundry-websearch/scripts/foundry-search.sh search "current date" --context low
 
 # Text-only output (no JSON wrapper)
-./azure-foundry-search/scripts/foundry-search.sh search "weather" --text-only
+./azure-foundry-websearch/scripts/foundry-search.sh search "weather" --text-only
 
 # Citations only
-./azure-foundry-search/scripts/foundry-search.sh search "news" --citations
+./azure-foundry-websearch/scripts/foundry-search.sh search "news" --citations
 
 # Use specific model deployment
-./azure-foundry-search/scripts/foundry-search.sh search "analysis" --model gpt-4o
+./azure-foundry-websearch/scripts/foundry-search.sh search "analysis" --model gpt-4o
 ```
 
 ### Status & Configuration
 
 ```bash
 # Check configuration and test API connection
-./azure-foundry-search/scripts/foundry-search.sh status
+./azure-foundry-websearch/scripts/foundry-search.sh status
 
 # Show current configuration (API key is masked)
-./azure-foundry-search/scripts/foundry-search.sh show
+./azure-foundry-websearch/scripts/foundry-search.sh show
 ```
 
 ## Output Format
@@ -167,7 +167,7 @@ All errors return JSON with `status`, `code`, `error`, and `solution` fields.
 Run the configure command:
 
 ```bash
-./azure-foundry-search/scripts/foundry-search.sh configure
+./azure-foundry-websearch/scripts/foundry-search.sh configure
 ```
 
 You'll be prompted for:
@@ -191,7 +191,7 @@ You'll be prompted for:
 ### Verify Setup
 
 ```bash
-./azure-foundry-search/scripts/foundry-search.sh status
+./azure-foundry-websearch/scripts/foundry-search.sh status
 ```
 
 Expected output:
@@ -210,7 +210,7 @@ Expected output:
 ### Config File Location
 
 ```
-~/.config/azure-foundry-search/config.json
+~/.config/azure-foundry-websearch/config.json
 ```
 
 ### Configuration Priority
@@ -230,7 +230,7 @@ export AZURE_FOUNDRY_MODEL="gpt-5-mini"
 
 ## Security
 
-- Credentials stored in `~/.config/azure-foundry-search/` (owner-only access)
+- Credentials stored in `~/.config/azure-foundry-websearch/` (owner-only access)
 - API key masked in `show` output
 - Web search uses Grounding with Bing - review [Microsoft's terms](https://www.microsoft.com/en-us/bing/apis/grounding-with-bing-terms)
 

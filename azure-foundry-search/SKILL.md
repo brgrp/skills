@@ -230,12 +230,9 @@ export AZURE_FOUNDRY_MODEL="gpt-5-mini"
 
 ## Security
 
-- **Config directory**: `~/.config/azure-foundry-search/` with permissions `700` (owner only)
-- **Config file**: `config.json` with permissions `600` (owner read/write only)
-- **API key input**: Silent input during configuration (not echoed to terminal)
-- **API key display**: Never logged or displayed in full (always masked as `abc1...xyz9`)
-- **API key in transit**: Passed to curl via stdin (`curl -K -`) to avoid exposure in process list
-- **Data handling**: Web search uses Grounding with Bing - review [Microsoft's terms](https://www.microsoft.com/en-us/bing/apis/grounding-with-bing-terms)
+- Credentials stored in `~/.config/azure-foundry-search/` (owner-only access)
+- API key masked in `show` output
+- Web search uses Grounding with Bing - review [Microsoft's terms](https://www.microsoft.com/en-us/bing/apis/grounding-with-bing-terms)
 
 ## Notes
 

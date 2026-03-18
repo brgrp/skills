@@ -1,9 +1,5 @@
 # Agent Guidelines
 
-## Required Reading
-
-Before creating or modifying any skill, read [GUIDE.md](./GUIDE.md) - the complete reference for skill structure, patterns, and best practices.
-
 ## Git Policy
 
 **CRITICAL: Never commit or push without explicit user approval.**
@@ -20,6 +16,10 @@ Before any push:
 3. Only then execute the push
 
 Do not interpret task completion as permission to commit or push. The user must actively say yes.
+
+## Required Reading
+
+Before creating or modifying any skill, read [GUIDE.md](./GUIDE.md) - the complete reference for skill structure, patterns, and best practices.
 
 ## Code Style
 

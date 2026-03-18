@@ -125,6 +125,7 @@ Credentials loaded from: env vars → `~/.config/spotify/credentials.json` → i
 ./scripts/spotify-ctl.sh play
 ./scripts/spotify-ctl.sh next
 ./scripts/spotify-ctl.sh prev
+./scripts/spotify-ctl.sh seek 60              # Seek to 60 seconds
 ./scripts/spotify-ctl.sh volume 50
 ./scripts/spotify-ctl.sh shuffle on|off
 ./scripts/spotify-ctl.sh repeat track|context|off
@@ -155,20 +156,18 @@ Credentials loaded from: env vars → `~/.config/spotify/credentials.json` → i
 
 ## Security
 
-### Credential Storage
+- Credentials stored in `~/.config/spotify/` (owner-only access)
+- Tokens auto-refresh when expired
 
-All sensitive files stored with restricted permissions:
-- Directory: `chmod 700`
-- Files: `chmod 600`
+## Error Codes
 
-### Input Validation
-
-- **Spotify URIs**: Must match `spotify:<type>:<base62id>` pattern
-- **Device IDs**: Validated as 40-char hex or UUID_amzn_N format
-- **JSON payloads**: Constructed using `jq` to prevent injection
-
-### API Data Handling
-
-- Search results returned as structured JSON for agent review
-- Agent makes semantic decisions about result relevance
-- All untrusted API data validated before use in subsequent requests
+| Code | Description | Solution |
+|------|-------------|----------|
+| `AUTH_REQUIRED` | No token found | Run `./scripts/spotify-auth.sh login` |
+| `AUTH_EXPIRED` | Token invalid/expired | Run `./scripts/spotify-auth.sh login` |
+| `PREMIUM_REQUIRED` | Playback needs Premium | Upgrade to Spotify Premium |
+| `NO_DEVICE` | No active playback device | Open Spotify app or use `--device` flag |
+| `DEVICE_NOT_FOUND` | Named device not available | Check `./scripts/spotify-ctl.sh devices` |
+| `INVALID_URI` | Malformed Spotify URI | Use format `spotify:track:<id>` |
+| `RATE_LIMITED` | Too many requests | Wait and retry |
+| `SEARCH_FAILED` | Search returned no results | Try different query |

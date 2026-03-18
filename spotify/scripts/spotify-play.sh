@@ -41,18 +41,25 @@ get_token() {
 }
 
 # API call with retry logic
+# Uses curl -K - to hide Bearer token from process list (security)
 api_call() {
     local method="$1"
     local url="$2"
     local data="$3"
     local max_retries=3
     local retry_delay=1
-    
-    local args=(-s -w "\n%{http_code}" -X "$method" "$url" -H "Authorization: Bearer $(get_token)")
-    [ -n "$data" ] && args+=(-H "Content-Type: application/json" -d "$data")
+    local token=$(get_token)
     
     for ((i=1; i<=max_retries; i++)); do
-        local response=$(curl "${args[@]}")
+        local response
+        if [ -n "$data" ]; then
+            response=$(echo "header = \"Authorization: Bearer $token\"" | \
+                curl -K - -s -w "\n%{http_code}" -X "$method" "$url" \
+                -H "Content-Type: application/json" -d "$data")
+        else
+            response=$(echo "header = \"Authorization: Bearer $token\"" | \
+                curl -K - -s -w "\n%{http_code}" -X "$method" "$url")
+        fi
         local http_code=$(echo "$response" | tail -1)
         local body=$(echo "$response" | sed '$d')
         
@@ -96,7 +103,8 @@ load_config() { [ -f "$CONFIG_FILE" ] && cat "$CONFIG_FILE" || echo '{}'; }
 
 save_config() {
     mkdir -p "$SPOTIFY_DIR" && chmod 700 "$SPOTIFY_DIR"
-    echo "$1" > "$CONFIG_FILE" && chmod 600 "$CONFIG_FILE"
+    # Use umask for atomic secure file creation (security: prevents race condition)
+    (umask 077 && echo "$1" > "$CONFIG_FILE")
 }
 
 get_default_device() { load_config | jq -r '.default_device // empty'; }
@@ -294,7 +302,7 @@ cmd_search() {
     local count=$(echo "$results" | jq 'length')
     
     if [ "$count" -eq 0 ]; then
-        echo '{"query":"'"$query"'","type":"'"$type"'","match":"none","results":[]}'
+        jq -n --arg q "$query" --arg t "$type" '{query:$q, type:$t, match:"none", results:[]}'
         exit 0
     fi
     
@@ -346,9 +354,9 @@ cmd_play() {
     
     if do_play_uri "$uri" "$device_id"; then
         log_info "Playback started"
-        echo '{"status":"playing","uri":"'"$uri"'"}'
+        jq -n --arg u "$uri" '{status:"playing", uri:$u}'
     else
-        echo '{"status":"error","uri":"'"$uri"'"}'
+        jq -n --arg u "$uri" '{status:"error", uri:$u}'
         exit 1
     fi
 }

@@ -76,22 +76,21 @@ prompt_credentials() {
         exit 1
     fi
     
-    read -p "Enter Spotify Client Secret: " SPOTIFY_CLIENT_SECRET
+    # Use silent input for secret (security: not echoed to terminal)
+    read -s -p "Enter Spotify Client Secret: " SPOTIFY_CLIENT_SECRET
+    echo ""  # Add newline after silent input
     if [ -z "$SPOTIFY_CLIENT_SECRET" ]; then
         log_error "Client Secret cannot be empty"
         exit 1
     fi
     
-    # Save credentials (secure directory permissions)
+    # Save credentials with atomic permissions (security: umask prevents race condition)
     mkdir -p "$SPOTIFY_DIR"
     chmod 700 "$SPOTIFY_DIR"
-    cat > "$CREDENTIALS_FILE" << EOF
-{
-  "client_id": "$SPOTIFY_CLIENT_ID",
-  "client_secret": "$SPOTIFY_CLIENT_SECRET"
-}
-EOF
-    chmod 600 "$CREDENTIALS_FILE"
+    (umask 077 && jq -n \
+        --arg id "$SPOTIFY_CLIENT_ID" \
+        --arg secret "$SPOTIFY_CLIENT_SECRET" \
+        '{client_id: $id, client_secret: $secret}' > "$CREDENTIALS_FILE")
     log_info "Credentials saved to $CREDENTIALS_FILE"
 }
 
@@ -137,9 +136,11 @@ get_auth_url() {
 exchange_code() {
     local code="$1"
     
-    local response=$(curl -s -X POST "https://accounts.spotify.com/api/token" \
+    # Use --data-binary @- to pass data via stdin (security: hides client_secret from ps)
+    local response=$(printf '%s' "grant_type=authorization_code&code=$code&redirect_uri=$REDIRECT_URI&client_id=$SPOTIFY_CLIENT_ID&client_secret=$SPOTIFY_CLIENT_SECRET" | \
+        curl -s -X POST "https://accounts.spotify.com/api/token" \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "grant_type=authorization_code&code=$code&redirect_uri=$REDIRECT_URI&client_id=$SPOTIFY_CLIENT_ID&client_secret=$SPOTIFY_CLIENT_SECRET")
+        --data-binary @-)
     
     if echo "$response" | jq -e '.access_token' > /dev/null 2>&1; then
         local access_token=$(echo "$response" | jq -r '.access_token')
@@ -147,14 +148,13 @@ exchange_code() {
         local expires_in=$(echo "$response" | jq -r '.expires_in')
         local expires_at=$(($(date +%s) + expires_in))
         
-        # Save tokens
-        echo "{
-  \"access_token\": \"$access_token\",
-  \"refresh_token\": \"$refresh_token\",
-  \"expires_at\": $expires_at
-}" > "$TOKEN_FILE"
+        # Save tokens with atomic permissions (security: umask prevents race condition)
+        (umask 077 && jq -n \
+            --arg at "$access_token" \
+            --arg rt "$refresh_token" \
+            --argjson exp "$expires_at" \
+            '{access_token: $at, refresh_token: $rt, expires_at: $exp}' > "$TOKEN_FILE")
         
-        chmod 600 "$TOKEN_FILE"
         log_info "Tokens saved to $TOKEN_FILE"
         return 0
     else
@@ -177,9 +177,11 @@ refresh_token() {
         return 1
     fi
     
-    local response=$(curl -s -X POST "https://accounts.spotify.com/api/token" \
+    # Use --data-binary @- to pass data via stdin (security: hides client_secret from ps)
+    local response=$(printf '%s' "grant_type=refresh_token&refresh_token=$refresh&client_id=$SPOTIFY_CLIENT_ID&client_secret=$SPOTIFY_CLIENT_SECRET" | \
+        curl -s -X POST "https://accounts.spotify.com/api/token" \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        -d "grant_type=refresh_token&refresh_token=$refresh&client_id=$SPOTIFY_CLIENT_ID&client_secret=$SPOTIFY_CLIENT_SECRET")
+        --data-binary @-)
     
     if echo "$response" | jq -e '.access_token' > /dev/null 2>&1; then
         local access_token=$(echo "$response" | jq -r '.access_token')
@@ -192,12 +194,12 @@ refresh_token() {
             new_refresh="$refresh"
         fi
         
-        # Update tokens
-        echo "{
-  \"access_token\": \"$access_token\",
-  \"refresh_token\": \"$new_refresh\",
-  \"expires_at\": $expires_at
-}" > "$TOKEN_FILE"
+        # Update tokens with atomic permissions (security: umask prevents race condition)
+        (umask 077 && jq -n \
+            --arg at "$access_token" \
+            --arg rt "$new_refresh" \
+            --argjson exp "$expires_at" \
+            '{access_token: $at, refresh_token: $rt, expires_at: $exp}' > "$TOKEN_FILE")
         
         log_info "Token refreshed successfully"
         return 0
@@ -242,10 +244,10 @@ check_status() {
     else
         log_info "Authenticated. Token expires in $((remaining / 60)) minutes"
         
-        # Test the token
+        # Test the token (security: use curl -K - to hide token from ps)
         local token=$(jq -r '.access_token' "$TOKEN_FILE")
-        local response=$(curl -s -w "%{http_code}" -o /dev/null \
-            -H "Authorization: Bearer $token" \
+        local response=$(echo "header = \"Authorization: Bearer $token\"" | \
+            curl -K - -s -w "%{http_code}" -o /dev/null \
             "https://api.spotify.com/v1/me")
         
         if [ "$response" = "200" ]; then

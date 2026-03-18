@@ -49,17 +49,26 @@ get_token() {
 }
 
 # API call with error handling and retry
+# Uses curl -K - to hide Bearer token from process list (security)
 api() {
     local method="$1"
     local endpoint="$2"
     local data="$3"
     local max_retries=3
-    
-    local args=(-s -w "\n%{http_code}" -X "$method" "https://api.spotify.com/v1$endpoint" -H "Authorization: Bearer $(get_token)")
-    [ -n "$data" ] && args+=(-H "Content-Type: application/json" -d "$data")
+    local token=$(get_token)
     
     for ((i=1; i<=max_retries; i++)); do
-        local response=$(curl "${args[@]}")
+        local response
+        if [ -n "$data" ]; then
+            response=$(echo "header = \"Authorization: Bearer $token\"" | \
+                curl -K - -s -w "\n%{http_code}" -X "$method" \
+                "https://api.spotify.com/v1$endpoint" \
+                -H "Content-Type: application/json" -d "$data")
+        else
+            response=$(echo "header = \"Authorization: Bearer $token\"" | \
+                curl -K - -s -w "\n%{http_code}" -X "$method" \
+                "https://api.spotify.com/v1$endpoint")
+        fi
         local http_code=$(echo "$response" | tail -1)
         local body=$(echo "$response" | sed '$d')
         

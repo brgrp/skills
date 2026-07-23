@@ -1,9 +1,9 @@
 ---
 name: platform-strategy
 description: |
-  Interview-driven skill for shaping platform strategy artifacts (strategy documents, executive presentations, and brainstorm outputs) using Gregor Hohpe's book "Platform Strategy: Innovation Through Harmonization." The agent runs a diagnostic interview based on the book's decision spine (what kind of platform, users and surprise, opinionated vs. restrictive, fruit salad or basket, sink or float, abstractions vs. illusions, tenancy, adoption, team shape) before drafting anything, then delivers an artifact anchored on one of Hohpe's metaphors and checked against his failure modes.
-  USE FOR: platform strategy doc, platform vision, internal developer platform pitch, IDP strategy, platform team charter, platform roadmap narrative, platform exec deck, "why our platform matters", "make the case for the platform", "structure the platform story", innovation through harmonization, platform paradox, opinionated platform, fruit salad or fruit basket, sink or float, platform brainstorm.
-  DO NOT USE FOR: implementing a platform, choosing tools (Backstage, Kubernetes, ArgoCD, etc.), day-2 operations, cloud migration strategy, generic architecture writing, or platform strategy work grounded in sources other than Hohpe's book.
+  Shapes platform strategy artifacts (strategy docs, exec presentations, brainstorms) using Gregor Hohpe's book "Platform Strategy: Innovation Through Harmonization." Runs a diagnostic interview on the book's decision spine (kind of platform, users and surprise, opinionated vs. restrictive, fruit salad or basket, sink or float, abstractions vs. illusions, tenancy, adoption, team shape) before drafting, then delivers an artifact anchored on a Hohpe metaphor and checked against his failure modes.
+  USE FOR: platform strategy doc, platform vision, IDP pitch, platform team charter, roadmap narrative, exec deck, "make the case for the platform", "structure the platform story", innovation through harmonization, platform paradox, opinionated platform, fruit salad or basket, sink or float, platform brainstorm.
+  DO NOT USE FOR: implementing a platform, choosing tools (Backstage, Kubernetes, ArgoCD), day-2 ops, cloud migration, generic architecture writing, or platform strategy grounded in sources other than Hohpe's book.
 license: MIT
 metadata:
   author: brgrp

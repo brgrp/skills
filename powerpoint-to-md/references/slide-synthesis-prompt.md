@@ -15,7 +15,6 @@ The agent's job, in full. Follow these rules literally when producing the two ma
 - **`<slug>.md`** — CONDENSED. LLM-first. No image references at all. The default file downstream tools should consume.
 - **`<slug>.with-images.md`** — DETAILED. Same narrative + plain-link references to every slide render and every embedded image. For human audit / spot-check against the source pixels.
 - **`<slug>-assets/`** — folder tree the extractor already prepared (`slides/*.png`, `images/*`).
-- **`README.md`** — usage guidance, pre-written by the orchestrator; the agent does not author this.
 
 The two `.md` files carry identical semantic content. Only difference: image-reference lines are present in `*.with-images.md` and absent in `*.md`.
 

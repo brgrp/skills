@@ -9,7 +9,8 @@
 # Environment (all required, set by the caller):
 #   SOFFICE_BIN   path to soffice / libreoffice executable
 #   RASTERIZER    one of: pdftoppm | magick | convert | pdf2image
-#   PYTHON_BIN    python interpreter (only used for pdf2image fallback)
+#   UV_BIN        path to uv (only used for the pdf2image fallback)
+#   SKILL_DIR     powerpoint-to-md skill root (contains pyproject.toml)
 #
 # Args:
 #   $1  input .pptx (absolute path)
@@ -110,8 +111,9 @@ render_magick() {
 }
 
 render_pdf2image() {
-    : "${PYTHON_BIN:?PYTHON_BIN required for pdf2image fallback}"
-    "$PYTHON_BIN" - "$PDF" "$SLIDES_OUT" <<'PY' >&2 || return 1
+    : "${UV_BIN:?UV_BIN required for pdf2image fallback}"
+    : "${SKILL_DIR:?SKILL_DIR required for pdf2image fallback}"
+    "$UV_BIN" --project "$SKILL_DIR" run --quiet python - "$PDF" "$SLIDES_OUT" <<'PY' >&2 || return 1
 import sys
 from pathlib import Path
 from pdf2image import convert_from_path
@@ -147,27 +149,20 @@ _normalize_slide_names() {
 }
 
 _shift_zero_based_to_one_based() {
-    # If slide-00.png exists, everything is off by one. Shift up.
-    if [[ -f "$SLIDES_OUT/slide-00.png" ]]; then
-        shopt -s nullglob
-        local files=()
-        for f in "$SLIDES_OUT"/slide-*.png; do
-            files+=("$f")
-        done
-        # Sort descending so we don't overwrite before shifting.
-        IFS=$'\n' sorted=($(printf '%s\n' "${files[@]}" | sort -r))
-        for f in "${sorted[@]}"; do
-            local base num new
-            base="$(basename "$f")"
-            num="${base#slide-}"
-            num="${num%.png}"
-            if [[ "$num" =~ ^[0-9]+$ ]]; then
-                new="$(printf 'slide-%02d.png' "$((10#$num + 1))")"
-                mv "$f" "$SLIDES_OUT/$new"
-            fi
-        done
-        shopt -u nullglob
-    fi
+    # ImageMagick's %02d starts at 0. If slide-00.png exists, shift up by 1.
+    [[ -f "$SLIDES_OUT/slide-00.png" ]] || return 0
+    local sorted=()
+    # Sort descending so we don't overwrite before shifting.
+    mapfile -t sorted < <(find "$SLIDES_OUT" -maxdepth 1 -name 'slide-*.png' -type f | sort -r)
+    for f in "${sorted[@]}"; do
+        local base num
+        base="$(basename "$f")"
+        num="${base#slide-}"
+        num="${num%.png}"
+        if [[ "$num" =~ ^[0-9]+$ ]]; then
+            mv "$f" "$SLIDES_OUT/$(printf 'slide-%02d.png' "$((10#$num + 1))")"
+        fi
+    done
 }
 
 log "rasterizing with $RASTERIZER..."

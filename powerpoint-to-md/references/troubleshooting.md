@@ -98,29 +98,43 @@ Change to:
 
 If you don't want to modify system policy, install poppler instead (preferred anyway).
 
-### 3. `pdf2image` (Python) — last resort
+### 3. `pdf2image` (Python via uv) — last resort
 
-```bash
-pip install pdf2image
-```
-
-`pdf2image` is a Python wrapper around poppler — it needs poppler's `pdftoppm` on Windows via a portable poppler zip. On macOS/Linux it needs `brew install poppler` / `apt install poppler-utils` anyway, so prefer using `pdftoppm` directly.
+`pdf2image` is already declared in `pyproject.toml`, so `uv sync` installs it automatically — no manual step required. It's a Python wrapper around poppler and still needs poppler's `pdftoppm` on Windows via a portable poppler zip. On macOS/Linux you also need `brew install poppler` / `apt install poppler-utils` for the wrapper to work, so prefer using `pdftoppm` directly.
 
 ---
 
-## Python modules
+## Python via uv (HARD DEP)
 
-Required:
+`uv` owns the Python interpreter and every library the skill uses. There is no separate `pip install` step.
 
+### Install uv
+
+**macOS:** `brew install uv`
+**Linux/macOS (curl):** `curl -LsSf https://astral.sh/uv/install.sh | sh`
+**Windows (PowerShell):** `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
+See https://docs.astral.sh/uv/ for other install methods.
+
+### How the skill uses uv
+
+`pptx2md.sh` runs `uv sync` inside `powerpoint-to-md/` on every `doctor` / `extract` invocation. That command:
+
+1. Reads `pyproject.toml` (declares `markitdown[pptx]`, `python-pptx`, `pdf2image`, Python ≥3.10).
+2. Locks against `uv.lock` for reproducibility.
+3. Creates/refreshes `.venv/` in the skill directory.
+4. All Python calls go through `uv run --project <skill> python …`, so they hit that venv.
+
+Minimum Python: 3.10 (uv will download and manage it if the system lacks one).
+
+### Common uv errors
+
+**"uv not found"** — install via one of the commands above, then re-run `pptx2md.sh doctor`.
+
+**"uv sync failed"** — usually a network / proxy issue. Run manually to see the raw error:
 ```bash
-pip install 'markitdown[pptx]' python-pptx
+uv --project ./powerpoint-to-md sync
 ```
-
-Minimum Python: 3.10. Check with `python3 --version`.
-
-**"ModuleNotFoundError: No module named 'markitdown'"** — you installed to a different interpreter than the one on `PATH`. Try `python3 -m pip install 'markitdown[pptx]' python-pptx`.
-
-**"ModuleNotFoundError: No module named 'pptx'"** — the pip package is `python-pptx`, not `pptx`. Reinstall: `pip install python-pptx`.
+Check that `pyproject.toml` and `uv.lock` are present and that the machine can reach https://pypi.org.
 
 **MarkItDown produces empty output** — some pptx variants (older `.ppt`, non-standard XML) trip MarkItDown. The pipeline continues on python-pptx only in that case (there's a `WARN: markitdown …` line in stderr). You still get a full `extract.json` — MarkItDown adds structural markdown, python-pptx supplies everything essential.
 
@@ -170,7 +184,8 @@ The manifest returns `status: "error"` with a `code`. Map:
 | `MISSING_DEP` | Python/jq missing | See doctor output |
 | `MISSING_LIBREOFFICE` | soffice not found | Install LibreOffice |
 | `MISSING_RASTERIZER` | No pdftoppm/magick/pdf2image | Install poppler |
-| `MISSING_PY_MODULES` | markitdown or python-pptx missing | `pip install` |
+| `MISSING_UV` | uv not on PATH | Install uv (see above) |
+| `UV_SYNC_FAILED` | uv could not resolve the venv | Run `uv --project ./powerpoint-to-md sync` manually |
 | `EXTRACT_TEXT_FAILED` | Track A failed | Check stderr; likely corrupt pptx |
 | `RENDER_FAILED` | Track B failed | Check stderr; likely soffice or policy issue |
 | `UNSAFE_PATH` | cleanup refused | Path didn't match `pptx2md-*` template |

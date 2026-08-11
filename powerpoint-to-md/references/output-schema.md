@@ -1,10 +1,10 @@
-# Output schema and `deck.md` template rules
+# Output schema and markdown template rules
 
 This file specifies:
 1. The shape of the intermediate `extract.json` file the agent reads.
-2. The exact structure the agent must write into `deck.md`.
+2. The exact structure the agent must write into the two markdown files.
 
-The agent (Claude / opencode / any vision-capable LLM) reads `extract.json` for verbatim text/numbers and reads the PNG renders for visual intent, then produces `deck.md` following the rules in `slide-synthesis-prompt.md`.
+The agent (any vision-capable LLM) reads `extract.json` for verbatim text/numbers and the PNG renders for visual intent, then produces the markdown following the rules in `slide-synthesis-prompt.md`.
 
 ---
 

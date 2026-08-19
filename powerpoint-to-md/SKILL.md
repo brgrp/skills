@@ -1,10 +1,10 @@
 ---
 name: powerpoint-to-md
-description: Convert a PowerPoint (.pptx) deck into LLM-readable Markdown that preserves text, speaker notes, tables, chart data, embedded images, and visual intent. Runs a hybrid pipeline (Microsoft MarkItDown + python-pptx for text, LibreOffice for per-slide PNG renders), then the calling agent synthesizes the final Markdown using native vision reasoning. USE FOR "convert this pptx to markdown", "turn my slides into markdown", "extract deck content", "pptx to md", "summarize a PowerPoint", "make slides readable for an LLM", "deck to markdown", ".pptx to .md". DO NOT USE FOR .pdf files, Google Slides (export to pptx first), .key Keynote files, or writing new PowerPoints from scratch.
+description: Convert a PowerPoint (.pptx) deck into LLM-readable Markdown that preserves text, speaker notes, tables, chart data, embedded images, and visual intent. Runs a hybrid pipeline (Microsoft MarkItDown + python-pptx for text, LibreOffice for per-slide PNG renders), then the calling agent synthesizes the final Markdown using native vision reasoning. REQUIRES a vision-capable model; refuses to run on text-only models via a mandatory PNG probe (Step 0). USE FOR "convert this pptx to markdown", "turn my slides into markdown", "extract deck content", "pptx to md", "summarize a PowerPoint", "deck to markdown", ".pptx to .md". DO NOT USE FOR .pdf files, Google Slides (export to pptx first), .key Keynote files, writing new PowerPoints from scratch, or with text-only models.
 license: MIT
 metadata:
   author: brgrp
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # PowerPoint → Markdown
@@ -12,6 +12,31 @@ metadata:
 **When activated, produce a grounded `deck.md` from a `.pptx`. Do not explain the pipeline to the user — run it.**
 
 Hybrid two-track extraction: **MarkItDown** + **python-pptx** for text, tables, chart series, speaker notes, and embedded images; **LibreOffice** for per-slide PNG renders. Python deps are pinned in `pyproject.toml` + `uv.lock` and installed on demand by `uv sync` — no system `pip install`. You (the agent) read both tracks and write two markdown files.
+
+## Step 0 — Vision preflight (MANDATORY, do this before anything else)
+
+This skill only works with vision-capable models. Roughly half of every deck lives in charts, diagrams, SmartArt, and org charts that are only extractable from the slide PNG renders. A text-only model will silently drop that content and produce a misleadingly clean `deck.md`. Refuse cleanly instead of half-doing the job.
+
+The plaintext answer to this probe is **not** in this file or anywhere else the agent can read as text — only the SHA-256 hash of the answer is committed. This is intentional: it prevents a text-only model from passing the gate by echoing a value it read from context.
+
+1. **Read the probe PNG** with your native vision tool: `powerpoint-to-md/assets/vision-probe.png`. It contains a short lowercase English phrase (two words, spaces allowed, letters only).
+
+2. **Normalize** what you read: strip surrounding whitespace, lowercase it, and collapse any run of internal whitespace to a single space.
+
+3. **Hash and compare.** Compute the SHA-256 of the normalized phrase (UTF-8, no trailing newline) and compare against `powerpoint-to-md/assets/vision-probe.sha256`. Example:
+
+   ```bash
+   printf '%s' "the phrase you read" | shasum -a 256 | awk '{print $1}'
+   # then diff against the contents of assets/vision-probe.sha256
+   ```
+
+4. **Gate.**
+   - Hashes match → proceed to Step 1 below.
+   - Hashes do not match, you cannot open PNGs, or your vision tool refuses → **stop immediately**. Do NOT run `doctor`, `extract`, or write any markdown files. Reply to the user with exactly this message and nothing more:
+
+     > This task requires a vision-capable model. The current model cannot reliably reason about image content, so charts, diagrams, and SmartArt in the deck would be silently dropped. No files have been written. Please re-run with a vision-capable model (e.g. Claude with vision, GPT-4o, Gemini 1.5+).
+
+Do not offer a text-only fallback. Do not "try anyway." A partial deck.md that appears complete but is missing every chart is worse than no output at all.
 
 ## On activation, run these four steps
 

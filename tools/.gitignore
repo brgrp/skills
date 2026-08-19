@@ -1,0 +1,6 @@
+# The generator lives outside the shipped skill on purpose — it contains the
+# plaintext answer to the powerpoint-to-md vision probe. Keep local artifacts
+# from ever crossing into commits.
+__pycache__/
+*.pyc
+.venv/

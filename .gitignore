@@ -2,3 +2,6 @@
 __pycache__/
 *.pyc
 .venv/
+
+# local Cursor CLI overrides (do not ship)
+.cursor/cli.json

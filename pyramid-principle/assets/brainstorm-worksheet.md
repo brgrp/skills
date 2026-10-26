@@ -103,16 +103,17 @@ _(This is a claim, not a topic. "We should do X because Y." Not "an overview of 
 
 Rebuild the story with the apex first:
 
-- **SCQA introduction:**
+- **Storyline variant** _(circle one)_: Standard (S-C-A) / Direct (A-S-C) / Concerned (C-S-A) / Aggressive (Q-S-C)
+- **SCQ introduction** _(write in variant order; Q may be implied in prose)_:
   - S:
   - C:
-  - Q:
+  - Q: _(spell out for yourself)_
   - A: _(= governing thought from step 5)_
 - **Key line 1** = Cluster A summary → detail = cleaned Cluster A items
 - **Key line 2** = Cluster B summary → detail = cleaned Cluster B items
 - **Key line 3** = Cluster C summary → detail = cleaned Cluster C items
 
-Pick an ordering (deductive / chronological / structural / degree) and re-order the key lines to match.
+Pick an ordering (deductive / chronological / structural / degree) and re-order the key lines to match. Plural-noun check on each key-line group.
 
 ---
 

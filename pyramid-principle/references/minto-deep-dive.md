@@ -56,43 +56,50 @@ Bottom-up is how Minto herself discovered the method — by editing McKinsey rep
 
 ---
 
-## 3. SCQA — storyline variants
+## 3. SCQ — storyline variants
 
-The order S → C → Q → A is the **standard** form. Sometimes you'll want to reorder for effect. Three variants:
+Minto's official brand is the **SCQ Framework** (Situation, Complication, Question). The **Answer** (solution / governing thought) is the pyramid apex. In prose the Question is often implied; spell it out for yourself before writing. Book Ch4 reorders for effect — do **not** force S→C→Q→A in every deliverable.
 
-### Standard — S, C, Q, A
+### Standard — S, C, Solution/Answer
 Neutral, informative. Best default. Use when the reader is unaware there's a problem.
 
-> Since we launched pricing v2 in July, all new customers have signed under the tiered split. [S] Two months in, SMB is compounding but Enterprise pipeline has softened, and Q4 spend is locked next week. [C] Where should we concentrate Q4 growth spend? [Q] Double down on SMB and run a 4-week Enterprise diagnostic before adding Enterprise spend. [A]
+> Since we launched pricing v2 in July, all new customers have signed under the tiered split. [S] Two months in, SMB is compounding but Enterprise pipeline has softened, and Q4 spend is locked next week. [C] Double down on SMB and run a 4-week Enterprise diagnostic before adding Enterprise spend. [A] *(Q implied: where to concentrate Q4 spend?)*
 
-### Direct — A, S, C, Q
+### Direct — Solution/Answer, S, C
 Lead with the answer, then justify. Use when the reader is impatient, senior, or already worried.
 
-> **Recommendation: double down on SMB in Q4, and diagnose Enterprise before spending there.** Pricing v2 has been in market for a full quarter. SMB is compounding; Enterprise pipeline has softened; Q4 spend is locked next week. The question is where to concentrate.
+> **Recommendation: double down on SMB in Q4, and diagnose Enterprise before spending there.** [A] Pricing v2 has been in market for a full quarter. [S] SMB is compounding; Enterprise pipeline has softened; Q4 spend is locked next week. [C]
 
-### Concern — C, S, Q, A
+### Concerned — C, S, Solution/Answer
 Lead with the tension. Use when the reader doesn't yet feel urgency.
 
-> **Enterprise pipeline has softened just as Q4 spend is being locked.** Pricing v2 has been in market since July, and SMB is compounding under the new tiers. The question is where to concentrate. We recommend doubling down on SMB and running an Enterprise diagnostic before adding Enterprise spend.
+> **Enterprise pipeline has softened just as Q4 spend is being locked.** [C] Pricing v2 has been in market since July, and SMB is compounding under the new tiers. [S] We recommend doubling down on SMB and running an Enterprise diagnostic before adding Enterprise spend. [A]
+
+### Aggressive — Q, S, C (, Answer)
+Lead with the question. Use when stating the question itself creates the pull.
+
+> **Where should we concentrate Q4 growth spend?** [Q] Pricing v2 has been in market a full quarter. [S] SMB is compounding while Enterprise pipeline has softened and spend locks next week. [C] Double down on SMB; diagnose Enterprise before adding spend. [A]
 
 ### Choosing the variant
 
 | Reader state | Variant |
 |---|---|
-| Neutral, informed | Standard (S-C-Q-A) |
-| Senior, wants the ask fast | Direct (A-S-C-Q) |
-| Not yet worried, needs to be | Concern (C-S-Q-A) |
+| Neutral, informed | Standard (S-C-A) |
+| Senior, wants the ask fast | Direct (A-S-C) |
+| Not yet worried, needs to be | Concerned (C-S-A) |
+| Question itself creates pull | Aggressive (Q-S-C) |
 | Skeptical or hostile | Standard, but expand C to make the tension undeniable |
 
-### SCQA element pitfalls
+### SCQ element pitfalls
 
 | Failure | Fix |
 |---|---|
 | Situation is really a Complication | Ask: does the reader already agree? If not, it's a C. |
-| Question is vague ("what should we do?") | Sharpen: "Where should we spend Q4?" |
+| Question is vague ("what should we do?") | Sharpen: "Where should we spend Q4?" — and keep it explicit for yourself even if implied in prose |
 | Answer is a topic ("Q4 strategy") | Rewrite as a claim: "We should double down on SMB." |
 | No Complication at all | If nothing changed, there's no reason for the document. Cut it or find the real trigger. |
-| Intro is longer than a page | S+C+Q+A fits in 3–5 sentences for a memo, one slide for a deck. |
+| Intro is longer than a page | Opening fits in 3–5 sentences for a memo, one slide for a deck. |
+| Checklist forces S-C-Q-A order | Wrong — match the chosen variant |
 
 ---
 

@@ -9,15 +9,17 @@ Fill in top-to-bottom. The whole point is that the reader gets the answer in the
 
 > <One-sentence governing thought: what this is + why it matters, in a claim, not a topic.>
 
-## What this is (SCQA in prose)
+## What this is (SCQ opening in prose)
 
 <Situation — what the reader already knows about the space.>
 
 <Complication — what's missing / broken / new that made this project necessary.>
 
-<Question — the specific question this project answers.>
+<Question — often implied; the specific question this project answers.>
 
 <Answer — restatement of the governing thought, expanded to 1–2 sentences.>
+
+_(Default order above is Standard S-C-Q-A. Direct/Concerned/Aggressive allowed when audience warrants it.)_
 
 ## Why you'd use it
 
@@ -74,21 +76,22 @@ Fill in top-to-bottom. The whole point is that the reader gets the answer in the
 ## Rules the template enforces
 
 - **Under the H1**, one sentence states the governing thought. No preamble.
-- **First heading is the SCQA**, written as prose the reader will actually read.
-- **Every H2 is a full-sentence question the reader is asking** at that point in the doc (What is it? Why use it? How install? How use? How does it work? When not to? How contribute?). The MECE structure is: identity → value → onboarding → usage → mechanism → limits → community.
+- **First heading is the SCQ opening**, written as prose the reader will actually read.
+- **H2s follow a default reader-question order** (identity → value → onboarding → usage → mechanism → limits → community) — prune sections that don't apply; this order is a scaffold, not mandatory MECE.
+- **Every H2 is a full-sentence question or point** — never "Background" or a bare category label.
 - **First sentence under every H2 states the section's point.** Detail follows.
 - **No section exists that doesn't trace up to the governing thought.**
 
-## MECE check for READMEs
+## Structure check for READMEs
 
 - [ ] Sections don't overlap (e.g. "Install" ≠ "Getting Started"; pick one).
 - [ ] Nothing critical missing (a reader with zero context can go from install to first success).
-- [ ] Ordered by reader priority — identity first, contribution last.
+- [ ] Empty template sections were pruned, not filled with filler.
 
 ## Final checklist
 
-- [ ] Reader knows what this is and why they'd care within 3 sentences.
-- [ ] SCQA is present, in order, in the opening.
-- [ ] Every section header is a full-sentence question or point (not "Installation" but "How to install").
+- [ ] Reader knows what this is and why they'd care early (Answer not buried).
+- [ ] SCQ + Answer accounted for; order matches the chosen variant.
+- [ ] Every section header is a full-sentence question or point (not "Installation" / "Background").
 - [ ] Every section's first sentence states the section's point.
 - [ ] Anything not traceable to the governing thought has been cut or moved.

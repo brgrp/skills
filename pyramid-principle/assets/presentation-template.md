@@ -12,14 +12,16 @@ Fill in the blanks in order. Do not skip. Do not open a slide tool until every b
 
 ---
 
-## 1. SCQA — the opening story
+## 1. SCQ opening — pick variant, then fill
+
+**Variant** _(circle one)_: Standard (S-C-A) / Direct (A-S-C) / Concerned (C-S-A) / Aggressive (Q-S-C)
 
 - **Situation** _(what the audience already knows and agrees with)_:
 - **Complication** _(what changed / what's now at stake)_:
-- **Question** _(the single question the Complication raises)_:
+- **Question** _(spell out for yourself even if implied in prose)_:
 - **Answer / governing thought** _(your one-sentence claim that answers Q)_:
 
-> Read S + C + Q + A aloud. Does it flow? Does the A truly answer the Q? If not, revise before continuing.
+> Write the opening in the **variant's order**. Read it aloud. Does A truly answer Q? If not, revise before continuing.
 
 ---
 
@@ -32,8 +34,8 @@ Each key line must be a **full sentence stating a point**, not a topic label.
 - **Key line 3:** _(optional)_
 - **Key line 4:** _(optional)_
 
-**MECE check:**
-- [ ] All key lines are the same kind (all reasons, all steps, all findings)?
+**MECE + same-kind check:**
+- [ ] All key lines are the same kind (plural noun: reasons / steps / findings / …)?
 - [ ] No two key lines overlap?
 - [ ] Together they exhaustively support A?
 
@@ -68,7 +70,7 @@ Repeat MECE + same-kind + ordering checks within each key line's group.
 
 | # | Slide title (full-sentence point, not topic) | Content |
 |---|---|---|
-| 1 | _(governing thought, verbatim)_ | SCQA in speaker notes |
+| 1 | _(governing thought / opening point)_ | SCQ opening in speaker notes (variant order) |
 | 2 | _Agenda: three reasons we should X_ | The 3 key lines as headers |
 | 3 | _Key line 1_ | Support 1.1–1.3 as body |
 | 4 | _Key line 2_ | Support 2.1–2.3 as body |
@@ -81,8 +83,9 @@ Repeat MECE + same-kind + ordering checks within each key line's group.
 
 ## 5. Final checklist
 
-- [ ] Slide 1 states the answer (or opens SCQA that lands on the answer within 30 seconds).
-- [ ] Every slide title is a full-sentence point.
+- [ ] Opening uses the chosen variant; Answer is not buried; Q was spelled out for the writer.
+- [ ] Every slide title is a full-sentence point — no "Background" or topic labels.
+- [ ] Key lines pass plural-noun same-kind + MECE.
 - [ ] Every key line traces up to A; every support traces up to its key line.
 - [ ] The closing slide restates A and names the specific decision or next step.
 - [ ] You could deliver this deck with the slides *off* and still make sense.

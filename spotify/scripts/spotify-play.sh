@@ -8,16 +8,15 @@
 #   ./spotify-play.sh --set-device "name"
 #
 # Search behavior:
-#   - If a clean match is found, auto-plays and returns success
-#   - If no clean match, returns JSON results for agent to review and pick
+#   - High-confidence match → auto-plays, returns {match:"auto", ...}
+#   - Otherwise → {match:"unclear", results:[...]} for the agent to pick
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPOTIFY_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/spotify"
 CONFIG_FILE="$SPOTIFY_DIR/config.json"
 
-# Colors (only for stderr messages)
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -27,69 +26,92 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1" >&2; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1" >&2; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 
-# Cached token
+emit_error() {
+    local code="$1" error="$2" solution="$3"
+    log_error "$error"
+    jq -n --arg c "$code" --arg e "$error" --arg s "$solution" \
+        '{status:"error", code:$c, error:$e, solution:$s}'
+}
+
 _TOKEN=""
 get_token() {
     if [ -z "$_TOKEN" ]; then
-        _TOKEN=$("$SCRIPT_DIR/spotify-auth.sh" token 2>/dev/null)
+        _TOKEN=$("$SCRIPT_DIR/spotify-auth.sh" token 2>/dev/null) || true
         if [ -z "$_TOKEN" ]; then
-            log_error "Failed to get token. Run: spotify-auth.sh login"
-            exit 1
+            return 1
         fi
     fi
     echo "$_TOKEN"
 }
 
-# API call with retry logic
-# Uses curl -K - to hide Bearer token from process list (security)
+# API call with retry. Uses curl -K - so the Bearer token is not on argv.
+# Captures Retry-After header on 429.
 api_call() {
     local method="$1"
     local url="$2"
-    local data="$3"
+    local data="${3:-}"
     local max_retries=3
     local retry_delay=1
-    local token=$(get_token)
-    
+    local token
+    if ! token=$(get_token); then
+        emit_error "AUTH_REQUIRED" "No valid Spotify token" \
+            "Ask user for Spotify Client ID/Secret if needed, save to ~/.config/spotify/credentials.json, then run ./spotify/scripts/spotify-auth.sh login"
+        return 1
+    fi
+
+    local hdr body_file
+    hdr=$(mktemp)
+    body_file=$(mktemp)
+    # shellcheck disable=SC2064
+    trap "rm -f '$hdr' '$body_file'" RETURN
+
+    local i
     for ((i=1; i<=max_retries; i++)); do
-        local response
+        local http_code
         if [ -n "$data" ]; then
-            response=$(echo "header = \"Authorization: Bearer $token\"" | \
-                curl -K - -s -w "\n%{http_code}" -X "$method" "$url" \
+            http_code=$(echo "header = \"Authorization: Bearer $token\"" | \
+                curl -K - -s -D "$hdr" -o "$body_file" -w "%{http_code}" -X "$method" "$url" \
                 -H "Content-Type: application/json" -d "$data")
         else
-            response=$(echo "header = \"Authorization: Bearer $token\"" | \
-                curl -K - -s -w "\n%{http_code}" -X "$method" "$url")
+            http_code=$(echo "header = \"Authorization: Bearer $token\"" | \
+                curl -K - -s -D "$hdr" -o "$body_file" -w "%{http_code}" -X "$method" "$url")
         fi
-        local http_code=$(echo "$response" | tail -1)
-        local body=$(echo "$response" | sed '$d')
-        
+        local body
+        body=$(cat "$body_file")
+
         case "$http_code" in
             200|201|202|204)
                 echo "$body"
                 return 0
                 ;;
             429)
-                local retry_after=$(echo "$body" | jq -r '.retry_after // 1')
+                local retry_after
+                retry_after=$(awk 'BEGIN{IGNORECASE=1} /^Retry-After:/ {print $2}' "$hdr" | tr -d '\r' | head -1)
+                retry_after=${retry_after:-1}
+                [[ "$retry_after" =~ ^[0-9]+$ ]] || retry_after=1
                 log_warn "Rate limited. Waiting ${retry_after}s..."
                 sleep "$retry_after"
                 ;;
             401)
-                log_error "Unauthorized. Run: spotify-auth.sh login"
+                emit_error "AUTH_EXPIRED" "Unauthorized (token invalid or expired)" \
+                    "Re-run ./spotify/scripts/spotify-auth.sh login (refresh credentials if login still fails)"
                 return 1
                 ;;
             403)
-                log_error "Forbidden. Spotify Premium required"
+                emit_error "PREMIUM_REQUIRED" "Forbidden — Spotify Premium required for playback" \
+                    "Upgrade to Spotify Premium"
                 return 1
                 ;;
             404)
                 return 44
                 ;;
             *)
-                if [ $i -lt $max_retries ]; then
+                if [ "$i" -lt "$max_retries" ]; then
                     sleep "$retry_delay"
                     retry_delay=$((retry_delay * 2))
                 else
-                    log_error "Request failed (HTTP $http_code)"
+                    emit_error "API_ERROR" "Request failed (HTTP $http_code)" \
+                        "Retry later or check Spotify API status"
                     return 1
                 fi
                 ;;
@@ -98,12 +120,10 @@ api_call() {
     return 1
 }
 
-# Config helpers
 load_config() { [ -f "$CONFIG_FILE" ] && cat "$CONFIG_FILE" || echo '{}'; }
 
 save_config() {
     mkdir -p "$SPOTIFY_DIR" && chmod 700 "$SPOTIFY_DIR"
-    # Use umask for atomic secure file creation (security: prevents race condition)
     (umask 077 && echo "$1" > "$CONFIG_FILE")
 }
 
@@ -114,38 +134,52 @@ set_default_device() {
     log_info "Default device set to: $1"
 }
 
-# Validate device ID (40-char hex or UUID_amzn_N for Echo)
 validate_device_id() {
     [[ "$1" =~ ^[a-fA-F0-9]{40}$ ]] || [[ "$1" =~ ^[a-f0-9-]{36}_amzn_[0-9]+$ ]]
 }
 
-# Get device ID by name
+# Prefer exact case-insensitive name; contains only if unique.
 get_device_id() {
-    local result=$(api_call GET "https://api.spotify.com/v1/me/player/devices")
-    local device_id=$(echo "$result" | jq -r --arg name "$1" \
-        '.devices[]? | select(.name | ascii_downcase | contains($name | ascii_downcase)) | .id' | head -1)
-    
-    [ -z "$device_id" ] && return 1
+    local name="$1"
+    local result
+    result=$(api_call GET "https://api.spotify.com/v1/me/player/devices") || return 1
+
+    local exact contains count device_id
+    exact=$(echo "$result" | jq -r --arg n "$name" \
+        '[.devices[]? | select((.name | ascii_downcase) == ($n | ascii_downcase)) | .id] | .[]')
+    count=$(printf '%s\n' "$exact" | grep -c . || true)
+    if [ "$count" -eq 1 ]; then
+        device_id="$exact"
+    elif [ "$count" -gt 1 ]; then
+        log_error "Multiple devices named '$name'"
+        return 1
+    else
+        contains=$(echo "$result" | jq -r --arg n "$name" \
+            '[.devices[]? | select(.name | ascii_downcase | contains($n | ascii_downcase)) | .id] | .[]')
+        count=$(printf '%s\n' "$contains" | grep -c . || true)
+        if [ "$count" -eq 1 ]; then
+            device_id="$contains"
+        else
+            return 1
+        fi
+    fi
+
     validate_device_id "$device_id" || { log_error "Invalid device ID"; return 1; }
     echo "$device_id"
 }
 
-# List devices as JSON
 list_devices_json() {
     api_call GET "https://api.spotify.com/v1/me/player/devices" | jq '{
         devices: [.devices[]? | {name, type, id, is_active, volume: .volume_percent}]
     }'
 }
 
-# URL encode using jq
 url_encode() {
     printf '%s' "$1" | jq -sRr @uri
 }
 
-# Validate Spotify URI
 validate_uri() { [[ "$1" =~ ^spotify:[a-z_]+:[a-zA-Z0-9]+$ ]]; }
 
-# Wake device
 wake_device() {
     log_info "Waking device..."
     api_call PUT "https://api.spotify.com/v1/me/player" \
@@ -153,95 +187,155 @@ wake_device() {
     sleep 2
 }
 
-# Normalize string for matching (lowercase, alphanumeric only)
 normalize() {
     echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9 ]//g' | xargs
 }
 
-# Check if query is a clean match for result name
-# Returns 0 if clean match, 1 otherwise
+# Strip common suffixes so "Bohemian Rhapsody - Remastered" can exact-match the query.
+core_name() {
+    echo "$1" | sed -E 's/ (remaster(ed)?([0-9 ]*)?|feat|ft|with|live|radio edit|extended|deluxe|anniversary).*$//' | xargs
+}
+
+# Remove whole words that are the result's artist so
+# "bohemian rhapsody by queen" can match the title Bohemian Rhapsody.
+without_artist_words() {
+    local query="$1"
+    local artist="$2"
+    local -a query_words artist_words kept
+    local word artist_word skip
+    read -ra query_words <<< "$query"
+    read -ra artist_words <<< "$artist"
+    for word in "${query_words[@]}"; do
+        skip=0
+        for artist_word in "${artist_words[@]}"; do
+            if [[ -n "$artist_word" && "$word" == "$artist_word" ]]; then
+                skip=1
+                break
+            fi
+        done
+        [[ "$skip" -eq 0 ]] && kept+=("$word")
+    done
+    echo "${kept[*]:-}"
+}
+
+# High-confidence only. Short / substring queries must return unclear.
+# artist is optional; its words are not required to appear in the title.
 is_clean_match() {
     local query="$1"
     local name="$2"
-    local norm_query=$(normalize "$query")
-    local norm_name=$(normalize "$name")
-    
-    # Exact match
+    local artist="${3:-}"
+    local norm_query norm_name core
+    norm_query=$(normalize "$query")
+    norm_name=$(normalize "$name")
+    core=$(core_name "$norm_name")
+
+    [[ -z "$norm_query" || -z "$norm_name" ]] && return 1
+
+    # Exact (full or core name — core strips remaster/feat suffixes)
     [[ "$norm_query" == "$norm_name" ]] && return 0
-    
-    # Name contains full query
-    [[ "$norm_name" == *"$norm_query"* ]] && return 0
-    
-    # Query contains full name (for short names like "Queen")
-    [[ "$norm_query" == *"$norm_name"* ]] && [[ ${#norm_name} -ge 4 ]] && return 0
-    
-    # Word-based matching for longer queries
+    [[ "$norm_query" == "$core" ]] && return 0
+
+    # Multi-word: ≥2 significant tokens (4+ chars), all present, name not much longer
     local -a query_words name_words
     read -ra query_words <<< "$norm_query"
-    read -ra name_words <<< "$norm_name"
-    
-    # Count significant words (3+ chars) that match
+    read -ra name_words <<< "$core"
+
     local matches=0 significant=0
+    local qw nw
     for qw in "${query_words[@]}"; do
-        [[ ${#qw} -lt 3 ]] && continue
-        ((significant++))
+        [[ ${#qw} -lt 4 ]] && continue
+        significant=$((significant + 1))
         for nw in "${name_words[@]}"; do
-            [[ "$qw" == "$nw" ]] && { ((matches++)); break; }
+            if [[ "$qw" == "$nw" ]]; then
+                matches=$((matches + 1))
+                break
+            fi
         done
     done
-    
-    # Need all significant words to match for "clean"
-    [[ $significant -gt 0 && $matches -eq $significant ]] && return 0
-    
+
+    if [[ $significant -ge 2 && $matches -eq $significant ]]; then
+        local name_sig=0
+        for nw in "${name_words[@]}"; do
+            [[ ${#nw} -ge 4 ]] && name_sig=$((name_sig + 1))
+        done
+        # Reject when the result title is much longer than the query
+        # ("best songs" must not auto-play "Best Songs of the 80s Forever Hits").
+        [[ $name_sig -le $((significant + 1)) ]] && return 0
+    fi
+
+    if [[ -n "$artist" ]]; then
+        local norm_artist reduced
+        norm_artist=$(normalize "$artist")
+        reduced=$(without_artist_words "$norm_query" "$norm_artist")
+        if [[ -n "$reduced" && "$reduced" != "$norm_query" ]]; then
+            is_clean_match "$reduced" "$name" && return 0
+        fi
+    fi
+
     return 1
 }
 
-#############################################
-# PLAY URI - Internal function
-#############################################
 do_play_uri() {
     local uri="$1"
-    local device_id="$2"
-    
+    local device_id="${2:-}"
+
     uri=$(echo "$uri" | sed 's/:playlist_v2:/:playlist:/')
-    validate_uri "$uri" || { log_error "Invalid URI: $uri"; return 1; }
-    
+    if ! validate_uri "$uri"; then
+        emit_error "INVALID_URI" "Invalid URI: $uri" "Use format spotify:track:<id> (or playlist/album/artist)"
+        return 1
+    fi
+
     local body
-    [[ "$uri" == *":track:"* ]] && body=$(jq -n --arg u "$uri" '{"uris":[$u]}') \
-                                || body=$(jq -n --arg u "$uri" '{"context_uri":$u}')
-    
+    if [[ "$uri" == *":track:"* ]]; then
+        body=$(jq -n --arg u "$uri" '{"uris":[$u]}')
+    else
+        body=$(jq -n --arg u "$uri" '{"context_uri":$u}')
+    fi
+
     local url="https://api.spotify.com/v1/me/player/play"
     [ -n "$device_id" ] && url="$url?device_id=$device_id"
-    
-    api_call PUT "$url" "$body"
-    local status=$?
-    
-    if [ $status -eq 44 ] && [ -n "$device_id" ]; then
+
+    local status=0
+    api_call PUT "$url" "$body" >/dev/null || status=$?
+
+    if [ "$status" -eq 44 ]; then
+        if [ -z "$device_id" ]; then
+            emit_error "NO_DEVICE" "No active playback device" \
+                "Open Spotify on a device, or pass --device / --set-device"
+            return 1
+        fi
         wake_device "$device_id"
-        api_call PUT "$url" "$body" >/dev/null
-        status=$?
+        if ! api_call PUT "$url" "$body" >/dev/null; then
+            emit_error "NO_DEVICE" "No active playback device" \
+                "Open Spotify on a device, or pass --device / --set-device"
+            return 1
+        fi
+        return 0
     fi
-    
-    return $status
+
+    return "$status"
 }
 
-# Get device ID from args or default
 resolve_device() {
-    local device_name="$1"
+    local device_name="${1:-}"
     if [ -n "$device_name" ]; then
-        get_device_id "$device_name"
+        get_device_id "$device_name" || {
+            emit_error "DEVICE_NOT_FOUND" "Device '$device_name' not found" \
+                "Check ./spotify/scripts/spotify-ctl.sh devices"
+            return 1
+        }
     else
-        local default=$(get_default_device)
-        [ -n "$default" ] && get_device_id "$default" || true
+        local default
+        default=$(get_default_device)
+        if [ -n "$default" ]; then
+            get_device_id "$default" || true
+        fi
     fi
 }
 
-#############################################
-# SEARCH COMMAND
-#############################################
 cmd_search() {
     local query="" type="track" device_name=""
-    
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --type|-t) type="$2"; shift 2 ;;
@@ -250,96 +344,98 @@ cmd_search() {
             *) query="$1"; shift ;;
         esac
     done
-    
+
     [ -z "$query" ] && { log_error "Usage: $0 search \"query\" [--type TYPE]"; exit 1; }
-    
+
     case "$type" in
         track|playlist|album|artist) ;;
         *) log_error "Invalid type. Use: track, playlist, album, artist"; exit 1 ;;
     esac
-    
-    # Search Spotify (10 results - API limit)
-    local encoded=$(url_encode "$query")
-    local raw=$(api_call GET "https://api.spotify.com/v1/search?q=$encoded&type=$type&limit=10")
-    [ -z "$raw" ] && { echo '{"error":"Search failed","results":[]}'; exit 1; }
-    
-    # Extract items path
-    local items_path
-    case "$type" in
-        track) items_path=".tracks.items" ;;
-        playlist) items_path=".playlists.items" ;;
-        album) items_path=".albums.items" ;;
-        artist) items_path=".artists.items" ;;
-    esac
-    
-    # Format results
-    local jq_filter
+
+    local encoded raw
+    encoded=$(url_encode "$query")
+    if ! raw=$(api_call GET "https://api.spotify.com/v1/search?q=$encoded&type=$type&limit=10"); then
+        printf '%s\n' "$raw"
+        exit 1
+    fi
+    [ -z "$raw" ] && {
+        emit_error "SEARCH_FAILED" "Search returned empty response" "Try a different query"
+        exit 1
+    }
+
+    local items_path jq_filter
     case "$type" in
         track)
+            items_path=".tracks.items"
             jq_filter='[.[]? | select(. != null) | {
                 name, artist: (.artists[0].name // "Unknown"),
                 album: (.album.name // "Unknown"), uri, duration_ms
-            }]' ;;
+            }]'
+            ;;
         playlist)
+            items_path=".playlists.items"
             jq_filter='[.[]? | select(. != null) | {
                 name, owner: (.owner.display_name // "Unknown"),
                 tracks: (.tracks.total // 0), uri
-            }]' ;;
+            }]'
+            ;;
         album)
+            items_path=".albums.items"
             jq_filter='[.[]? | select(. != null) | {
                 name, artist: (.artists[0].name // "Unknown"),
                 year: (.release_date // "" | split("-")[0]),
                 tracks: (.total_tracks // 0), uri
-            }]' ;;
+            }]'
+            ;;
         artist)
+            items_path=".artists.items"
             jq_filter='[.[]? | select(. != null) | {
                 name, genres: (.genres[:3] // []),
                 followers: (.followers.total // 0), uri
-            }]' ;;
+            }]'
+            ;;
     esac
-    
-    local results=$(echo "$raw" | jq "$items_path | $jq_filter")
-    local count=$(echo "$results" | jq 'length')
-    
+
+    local results count
+    results=$(echo "$raw" | jq "$items_path | $jq_filter")
+    count=$(echo "$results" | jq 'length')
+
     if [ "$count" -eq 0 ]; then
         jq -n --arg q "$query" --arg t "$type" '{query:$q, type:$t, match:"none", results:[]}'
         exit 0
     fi
-    
-    # Check if first result is a clean match
-    local first_name=$(echo "$results" | jq -r '.[0].name // ""')
-    local first_uri=$(echo "$results" | jq -r '.[0].uri // ""')
-    
-    if is_clean_match "$query" "$first_name"; then
-        # Clean match - auto-play!
-        local device_id=$(resolve_device "$device_name")
-        
+
+    local first_name first_uri first_artist
+    first_name=$(echo "$results" | jq -r '.[0].name // ""')
+    first_uri=$(echo "$results" | jq -r '.[0].uri // ""')
+    first_artist=$(echo "$results" | jq -r '.[0].artist // ""')
+
+    if is_clean_match "$query" "$first_name" "$first_artist"; then
+        local device_id=""
+        if ! device_id=$(resolve_device "$device_name"); then
+            printf '%s\n' "$device_id"
+            exit 1
+        fi
+
         if do_play_uri "$first_uri" "$device_id"; then
-            # Return success with what's playing
-            local first_artist=$(echo "$results" | jq -r '.[0].artist // .[0].owner // "Unknown"')
-            log_info "Playing: $first_name by $first_artist"
+            local shown_artist
+            shown_artist=$(echo "$results" | jq -r '.[0].artist // .[0].owner // "Unknown"')
+            log_info "Playing: $first_name by $shown_artist"
             echo "$results" | jq --arg q "$query" --arg t "$type" \
                 '{query:$q, type:$t, match:"auto", playing:.[0], results:.}'
         else
-            log_error "Playback failed"
-            echo "$results" | jq --arg q "$query" --arg t "$type" \
-                '{query:$q, type:$t, match:"failed", results:.}'
             exit 1
         fi
     else
-        # No clean match - return results for agent to pick
-        log_warn "No exact match for '$query'. Review results and pick one."
+        log_warn "No high-confidence match for '$query'. Review results and pick one."
         echo "$results" | jq --arg q "$query" --arg t "$type" \
             '{query:$q, type:$t, match:"unclear", results:.}'
     fi
 }
 
-#############################################
-# PLAY COMMAND
-#############################################
 cmd_play() {
     local uri="" device_name=""
-    
+
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --device|-d) device_name="$2"; shift 2 ;;
@@ -347,30 +443,31 @@ cmd_play() {
             *) uri="$1"; shift ;;
         esac
     done
-    
+
     [ -z "$uri" ] && { log_error "Usage: $0 play <spotify:uri> [--device NAME]"; exit 1; }
-    
-    local device_id=$(resolve_device "$device_name")
-    
+
+    local device_id=""
+    if ! device_id=$(resolve_device "$device_name"); then
+        printf '%s\n' "$device_id"
+        exit 1
+    fi
+
     if do_play_uri "$uri" "$device_id"; then
         log_info "Playback started"
         jq -n --arg u "$uri" '{status:"playing", uri:$u}'
     else
-        jq -n --arg u "$uri" '{status:"error", uri:$u}'
         exit 1
     fi
 }
 
-#############################################
-# MAIN
-#############################################
 case "${1:-}" in
     search) shift; cmd_search "$@" ;;
     play) shift; cmd_play "$@" ;;
     --devices) list_devices_json ;;
     --set-device)
-        [ -z "$2" ] && { log_error "Usage: $0 --set-device <name>"; exit 1; }
-        set_default_device "$2" ;;
+        [ -z "${2:-}" ] && { log_error "Usage: $0 --set-device <name>"; exit 1; }
+        set_default_device "$2"
+        ;;
     -h|--help|"")
         cat << 'EOF'
 Spotify Search & Play
@@ -382,11 +479,9 @@ Usage:
   spotify-play.sh --set-device NAME
 
 Search behavior:
-  - Clean match found    → Auto-plays, returns {match:"auto", playing:{...}}
-  - No clean match       → Returns {match:"unclear", results:[...]} for agent to pick
-  - No results           → Returns {match:"none", results:[]}
-
-Then agent calls 'play' with chosen URI if needed.
+  - High-confidence match → Auto-plays, returns {match:"auto", playing:{...}}
+  - Otherwise             → Returns {match:"unclear", results:[...]} for agent to pick
+  - No results            → Returns {match:"none", results:[]}
 EOF
         ;;
     *) log_error "Unknown command: $1"; exit 1 ;;

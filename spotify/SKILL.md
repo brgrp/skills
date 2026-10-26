@@ -4,172 +4,130 @@ description: |
   Control Spotify playback via CLI. Requires Spotify Premium for playback control.
   USE FOR: play song, play music, play [song name], play [artist], play [album], play [playlist], pause, stop music, resume, skip, next song, previous song, what's playing, now playing, current song, volume up, volume down, set volume, shuffle on, shuffle off, repeat, queue, add to queue, list devices, transfer playback, play on [device].
   DO NOT USE FOR: downloading music, editing playlists, creating playlists.
+license: MIT
 metadata:
-  version: "0.3"
+  author: brgrp
+  version: "0.4.0"
+compatibility: Requires Spotify Premium for playback. Needs curl, jq, and openssl. python3 is only the login listener on 127.0.0.1:17823.
 ---
 
 # Spotify Control
 
-## Agent Workflow
+**When activated, get music playing. Check auth first — do not ask the user to read setup docs.**
 
-### Playing Music
+Never print Client Secret, access/refresh tokens, or callback URLs that contain `code=` into chat. `spotify-auth.sh token` is for scripts only.
 
-Use the two-step search → play workflow:
+All commands below assume repo root. From this skill folder, use `./scripts/...` instead of `./spotify/scripts/...`.
 
-```bash
-# Step 1: Search (returns JSON)
-./scripts/spotify-play.sh search "bohemian rhapsody" --type track
-```
-
-**Response types:**
-
-1. **Clean match** (`"match": "auto"`) - Already playing, done!
-```json
-{"query":"bohemian rhapsody","type":"track","match":"auto",
- "playing":{"name":"Bohemian Rhapsody","artist":"Queen","uri":"spotify:track:xxx"},
- "results":[...]}
-```
-
-2. **Unclear match** (`"match": "unclear"`) - Review results, pick best one:
-```json
-{"query":"rock classics","type":"playlist","match":"unclear",
- "results":[
-   {"name":"Rock Classics","owner":"Spotify","uri":"spotify:playlist:xxx"},
-   {"name":"Classic Rock Hits","owner":"Someone","uri":"spotify:playlist:yyy"}
- ]}
-```
-Then call:
-```bash
-./scripts/spotify-play.sh play "spotify:playlist:xxx"
-```
-
-3. **No results** (`"match": "none"`) - Tell user nothing found
-
-### Decision Rules
-
-When `match` is `"unclear"`:
-1. Review the `results` array
-2. Pick the best match based on name similarity to original query
-3. If genuinely ambiguous, ask the user which one they want
-4. Call `play` with the chosen URI
-
-## Quick Start
+## Step 0 — Auth preflight (mandatory)
 
 ```bash
-# Search and play (auto-plays if clean match)
-./scripts/spotify-play.sh search "bohemian rhapsody"
-
-# Play specific URI
-./scripts/spotify-play.sh play "spotify:track:4u7EnebtmKWzUH433cf5Qv"
-
-# Playback controls
-./scripts/spotify-ctl.sh pause
-./scripts/spotify-ctl.sh play
-./scripts/spotify-ctl.sh next
+./spotify/scripts/spotify-auth.sh status
 ```
 
-## Setup
+- Authenticated → continue to Play.
+- Not authenticated → run **First-time auth** below, then continue. Do not search/play until status is OK.
 
-### Dependencies
+### First-time auth (agent runs this)
 
-Requires `jq` for JSON processing. Other tools are built-in on macOS/Linux.
+1. **Ensure a Spotify app exists** (one-time per user). If the user has no Client ID/Secret yet, tell them exactly:
+   - Open https://developer.spotify.com/dashboard → Create App → Web API
+   - Redirect URI must be exactly: `http://127.0.0.1:17823/callback`
+   - Copy **Client ID** and **Client Secret**
+   - Playback needs **Spotify Premium**; open the Spotify app on a device before playing
+
+2. **Collect credentials** — ask the user for Client ID and Client Secret (do not invent them). Then save:
 
 ```bash
-# macOS
-brew install jq
-
-# Linux (Debian/Ubuntu)
-sudo apt install jq
+mkdir -p ~/.config/spotify && chmod 700 ~/.config/spotify
+# Replace PLACEHOLDERS with the values the user provided:
+(umask 077 && jq -n --arg id 'PLACEHOLDER_CLIENT_ID' --arg secret 'PLACEHOLDER_CLIENT_SECRET' \
+  '{client_id:$id, client_secret:$secret}' > ~/.config/spotify/credentials.json)
 ```
 
-### Spotify Developer Account (one-time)
+Or export `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for this shell only.
 
-1. Go to https://developer.spotify.com/dashboard
-2. Log in with your Spotify account
-3. Click **Create App** → name it anything → select "Web API"
-4. Add redirect URI: `http://127.0.0.1:17823/callback`
-5. Copy your **Client ID** and **Client Secret**
+3. **Start OAuth.**
 
-**Note**: Requires Spotify Premium for playback control. Free accounts can only search.
-
-### First Run
+On the same machine as the browser:
 
 ```bash
-./scripts/spotify-auth.sh login
+./spotify/scripts/spotify-auth.sh login
 ```
 
-Credentials loaded from: env vars → `~/.config/spotify/credentials.json` → interactive prompt
+Open **`http://127.0.0.1:17823/`** (do not paste the long authorize URL; `&` gets truncated). Approve access.
 
-## Commands
-
-### spotify-play.sh
+From a remote machine or sandbox, `login` prints an authorize URL instead of listening. The user opens that URL, approves, and copies the address bar after the failed redirect to `127.0.0.1`. Then:
 
 ```bash
-# Search (returns JSON, auto-plays if clean match)
-./scripts/spotify-play.sh search "song name"
-./scripts/spotify-play.sh search "playlist name" --type playlist
-./scripts/spotify-play.sh search "artist" --type artist
-./scripts/spotify-play.sh search "album" --type album
-
-# Play specific URI
-./scripts/spotify-play.sh play "spotify:track:xxx"
-./scripts/spotify-play.sh play "spotify:playlist:xxx" --device "Kitchen Echo"
-
-# Device management
-./scripts/spotify-play.sh --devices              # List devices (JSON)
-./scripts/spotify-play.sh --set-device "Echo"    # Set default device
+./spotify/scripts/spotify-auth.sh login --callback 'PASTED_URL'
 ```
-
-### spotify-ctl.sh
 
 ```bash
-./scripts/spotify-ctl.sh pause
-./scripts/spotify-ctl.sh play
-./scripts/spotify-ctl.sh next
-./scripts/spotify-ctl.sh prev
-./scripts/spotify-ctl.sh seek 60              # Seek to 60 seconds
-./scripts/spotify-ctl.sh volume 50
-./scripts/spotify-ctl.sh shuffle on|off
-./scripts/spotify-ctl.sh repeat track|context|off
-./scripts/spotify-ctl.sh devices        # List devices
-./scripts/spotify-ctl.sh transfer Echo  # Move playback to device
-./scripts/spotify-ctl.sh now            # What's playing
-./scripts/spotify-ctl.sh queue          # Show queue
-./scripts/spotify-ctl.sh add-queue <uri>
+./spotify/scripts/spotify-auth.sh status
 ```
 
-## Error Handling
+4. If login fails with missing credentials, you skipped step 2 — ask again. If callback times out, re-run `login` and ensure the redirect URI matches exactly.
 
-| Error | Solution |
-|-------|----------|
-| No token | Run `./scripts/spotify-auth.sh login` |
-| No active device | Use `--device` flag or `--set-device` |
-| 403 Premium required | Playback needs Spotify Premium |
-| 401 Unauthorized | Re-run `./scripts/spotify-auth.sh login` |
+## Play
+
+```bash
+./spotify/scripts/spotify-play.sh search "bohemian rhapsody" --type track
+```
+
+Infer `--type` from the user (`track` / `playlist` / `album` / `artist`). Default `track` if unsure. `"song by artist"` is a normal track search (e.g. `bohemian rhapsody by queen`).
+
+| `match` / `status` | Agent action |
+|--------------------|--------------|
+| `auto` | Confirm with `now` — report **title, artist, device, volume**. If volume is very low (under ~15), warn it may be inaudible |
+| `unclear` | Pick best `results[]` URI, or ask if ambiguous; then `play`. Mood / "something else" / "more like that" stay unclear — do not invent a playlist |
+| `none` | Tell user nothing found |
+| `status: error` | Follow `code` + `solution` (table below). `AUTH_*` → Step 0 |
+
+```bash
+./spotify/scripts/spotify-play.sh play "spotify:track:xxx"
+./spotify/scripts/spotify-play.sh play "spotify:playlist:xxx" --device "Kitchen Echo"
+```
+
+Short/ambiguous queries stay `unclear` (e.g. `"rock"`). Do not force auto-play.
+
+## Controls
+
+```bash
+./spotify/scripts/spotify-ctl.sh pause|play|next|prev
+./spotify/scripts/spotify-ctl.sh volume 50|up|down
+./spotify/scripts/spotify-ctl.sh shuffle on|off
+./spotify/scripts/spotify-ctl.sh repeat track|context|off
+./spotify/scripts/spotify-ctl.sh now|queue|devices
+./spotify/scripts/spotify-ctl.sh transfer Echo
+./spotify/scripts/spotify-ctl.sh seek 60
+./spotify/scripts/spotify-ctl.sh add-queue spotify:track:xxx
+```
+
+`now` reports `playing` or `paused`, plus device and volume. `next` after a single-track play may stay on the same song; use album/playlist context or `add-queue` when skip must advance.
+
+Devices:
+
+```bash
+./spotify/scripts/spotify-play.sh --devices
+./spotify/scripts/spotify-play.sh --set-device "Echo"
+```
+
+## Errors
+
+Stdout JSON on failure: `{"status":"error","code":"...","error":"...","solution":"..."}` (human text on stderr).
+
+| Code | Agent next step |
+|------|-----------------|
+| `AUTH_REQUIRED` / `AUTH_EXPIRED` | Step 0 (save credentials if needed, then `login`) |
+| `PREMIUM_REQUIRED` | Tell user Premium is required |
+| `NO_DEVICE` | Ask user to open Spotify on a device; `--devices` / `--device` / `--set-device` |
+| `DEVICE_NOT_FOUND` | List devices; ask which name |
+| `INVALID_URI` | Fix URI shape `spotify:track:<id>` (or playlist/album/artist) |
+| `SEARCH_FAILED` / `API_ERROR` | Retry or rephrase |
 
 ## Files
 
-```
-~/.config/spotify/           # or $XDG_CONFIG_HOME/spotify/
-├── credentials.json         # Client ID/Secret (chmod 600)
-├── tokens.json              # Access/refresh tokens (chmod 600)
-└── config.json              # Default device, preferences
-```
+`~/.config/spotify/` (`credentials.json`, `tokens.json`, `config.json`) — mode 700/600. Tokens refresh automatically.
 
-## Security
-
-- Credentials stored in `~/.config/spotify/` (owner-only access)
-- Tokens auto-refresh when expired
-
-## Error Codes
-
-| Code | Description | Solution |
-|------|-------------|----------|
-| `AUTH_REQUIRED` | No token found | Run `./scripts/spotify-auth.sh login` |
-| `AUTH_EXPIRED` | Token invalid/expired | Run `./scripts/spotify-auth.sh login` |
-| `PREMIUM_REQUIRED` | Playback needs Premium | Upgrade to Spotify Premium |
-| `NO_DEVICE` | No active playback device | Open Spotify app or use `--device` flag |
-| `DEVICE_NOT_FOUND` | Named device not available | Check `./scripts/spotify-ctl.sh devices` |
-| `INVALID_URI` | Malformed Spotify URI | Use format `spotify:track:<id>` |
-| `RATE_LIMITED` | Too many requests | Wait and retry |
-| `SEARCH_FAILED` | Search returned no results | Try different query |
+Deps: `curl`, `jq`, `openssl`. `python3` only for `login` (loopback redirect).

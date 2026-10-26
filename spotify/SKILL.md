@@ -7,7 +7,7 @@ description: |
 license: MIT
 metadata:
   author: brgrp
-  version: "0.4.0"
+  version: "0.5.0"
 compatibility: Requires Spotify Premium for playback. Needs curl, jq, and openssl. python3 is only the login listener on 127.0.0.1:17823.
 ---
 
@@ -17,16 +17,16 @@ compatibility: Requires Spotify Premium for playback. Needs curl, jq, and openss
 
 Never print Client Secret, access/refresh tokens, or callback URLs that contain `code=` into chat. `spotify-auth.sh token` is for scripts only.
 
-All commands below assume repo root. From this skill folder, use `./scripts/...` instead of `./spotify/scripts/...`.
+All commands below assume this skill folder (`./scripts/...`). From the `git/skills` repo root, use `./spotify/scripts/...` instead.
 
 ## Step 0 — Auth preflight (mandatory)
 
 ```bash
-./spotify/scripts/spotify-auth.sh status
+./scripts/spotify-auth.sh status
 ```
 
-- Authenticated → continue to Play.
-- Not authenticated → run **First-time auth** below, then continue. Do not search/play until status is OK.
+- Authenticated → continue.
+- Not authenticated → run **First-time auth** below. Do not search/play until status is OK.
 
 ### First-time auth (agent runs this)
 
@@ -40,7 +40,6 @@ All commands below assume repo root. From this skill folder, use `./scripts/...`
 
 ```bash
 mkdir -p ~/.config/spotify && chmod 700 ~/.config/spotify
-# Replace PLACEHOLDERS with the values the user provided:
 (umask 077 && jq -n --arg id 'PLACEHOLDER_CLIENT_ID' --arg secret 'PLACEHOLDER_CLIENT_SECRET' \
   '{client_id:$id, client_secret:$secret}' > ~/.config/spotify/credentials.json)
 ```
@@ -52,7 +51,7 @@ Or export `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` for this shell only.
 On the same machine as the browser:
 
 ```bash
-./spotify/scripts/spotify-auth.sh login
+./scripts/spotify-auth.sh login
 ```
 
 Open **`http://127.0.0.1:17823/`** (do not paste the long authorize URL; `&` gets truncated). Approve access.
@@ -60,58 +59,42 @@ Open **`http://127.0.0.1:17823/`** (do not paste the long authorize URL; `&` get
 From a remote machine or sandbox, `login` prints an authorize URL instead of listening. The user opens that URL, approves, and copies the address bar after the failed redirect to `127.0.0.1`. Then:
 
 ```bash
-./spotify/scripts/spotify-auth.sh login --callback 'PASTED_URL'
-```
-
-```bash
-./spotify/scripts/spotify-auth.sh status
+./scripts/spotify-auth.sh login --callback 'PASTED_URL'
+./scripts/spotify-auth.sh status
 ```
 
 4. If login fails with missing credentials, you skipped step 2 — ask again. If callback times out, re-run `login` and ensure the redirect URI matches exactly.
 
-## Play
+## One CLI: `spotify.sh`
 
 ```bash
-./spotify/scripts/spotify-play.sh search "bohemian rhapsody" --type track
+./scripts/spotify.sh search "bohemian rhapsody" --type track
+./scripts/spotify.sh play "spotify:track:xxx" --device "Kitchen Echo"
+./scripts/spotify.sh pause|resume|next|prev
+./scripts/spotify.sh now|queue|devices
+./scripts/spotify.sh device "Echo Wohnzimmer"    # default device
+./scripts/spotify.sh transfer "Echo Wohnzimmer"
+./scripts/spotify.sh volume 50|up|down
+./scripts/spotify.sh shuffle on|off
+./scripts/spotify.sh repeat track|context|off
+./scripts/spotify.sh seek 60
+./scripts/spotify.sh add-queue spotify:track:xxx
 ```
 
 Infer `--type` from the user (`track` / `playlist` / `album` / `artist`). Default `track` if unsure. `"song by artist"` is a normal track search (e.g. `bohemian rhapsody by queen`).
 
 | `match` / `status` | Agent action |
 |--------------------|--------------|
-| `auto` | Confirm with `now` — report **title, artist, device, volume**. If volume is very low (under ~15), warn it may be inaudible |
+| `auto` | Report **title, artist, device, volume** from the response `now` object (no extra `now` call). If volume is under ~15, warn it may be inaudible |
 | `unclear` | Pick best `results[]` URI, or ask if ambiguous; then `play`. Mood / "something else" / "more like that" stay unclear — do not invent a playlist |
 | `none` | Tell user nothing found |
 | `status: error` | Follow `code` + `solution` (table below). `AUTH_*` → Step 0 |
 
-```bash
-./spotify/scripts/spotify-play.sh play "spotify:track:xxx"
-./spotify/scripts/spotify-play.sh play "spotify:playlist:xxx" --device "Kitchen Echo"
-```
-
 Short/ambiguous queries stay `unclear` (e.g. `"rock"`). Do not force auto-play.
 
-## Controls
+`now` returns JSON: `status` (`playing`/`paused`/`none`), `name`, `artist`, `album`, `device`, `volume`. Prefer `search`/`play`/`next` output `now` when present.
 
-```bash
-./spotify/scripts/spotify-ctl.sh pause|play|next|prev
-./spotify/scripts/spotify-ctl.sh volume 50|up|down
-./spotify/scripts/spotify-ctl.sh shuffle on|off
-./spotify/scripts/spotify-ctl.sh repeat track|context|off
-./spotify/scripts/spotify-ctl.sh now|queue|devices
-./spotify/scripts/spotify-ctl.sh transfer Echo
-./spotify/scripts/spotify-ctl.sh seek 60
-./spotify/scripts/spotify-ctl.sh add-queue spotify:track:xxx
-```
-
-`now` reports `playing` or `paused`, plus device and volume. `next` after a single-track play may stay on the same song; use album/playlist context or `add-queue` when skip must advance.
-
-Devices:
-
-```bash
-./spotify/scripts/spotify-play.sh --devices
-./spotify/scripts/spotify-play.sh --set-device "Echo"
-```
+`next` after a single-track play may stay on the same song; use album/playlist context or `add-queue` when skip must advance.
 
 ## Errors
 
@@ -121,7 +104,7 @@ Stdout JSON on failure: `{"status":"error","code":"...","error":"...","solution"
 |------|-----------------|
 | `AUTH_REQUIRED` / `AUTH_EXPIRED` | Step 0 (save credentials if needed, then `login`) |
 | `PREMIUM_REQUIRED` | Tell user Premium is required |
-| `NO_DEVICE` | Ask user to open Spotify on a device; `--devices` / `--device` / `--set-device` |
+| `NO_DEVICE` | Ask user to open Spotify on a device; `devices` / `--device` / `device NAME` |
 | `DEVICE_NOT_FOUND` | List devices; ask which name |
 | `INVALID_URI` | Fix URI shape `spotify:track:<id>` (or playlist/album/artist) |
 | `SEARCH_FAILED` / `API_ERROR` | Retry or rephrase |
@@ -131,3 +114,5 @@ Stdout JSON on failure: `{"status":"error","code":"...","error":"...","solution"
 `~/.config/spotify/` (`credentials.json`, `tokens.json`, `config.json`) — mode 700/600. Tokens refresh automatically.
 
 Deps: `curl`, `jq`, `openssl`. `python3` only for `login` (loopback redirect).
+
+`spotify-play.sh` / `spotify-ctl.sh` are thin compatibility wrappers around `spotify.sh`.

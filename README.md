@@ -8,7 +8,6 @@ A collection of [Agent Skills](https://agentskills.io) — portable, on-demand c
 |-------|--------------|
 | [`platform-strategy`](./platform-strategy) | Shapes platform strategy docs, exec decks, and brainstorms using Gregor Hohpe's *Platform Strategy* — interview first, then deliver. |
 | [`pyramid-principle`](./pyramid-principle) | Structures presentations, READMEs, and brainstorm output answer-first using Barbara Minto's Pyramid Principle. |
-| [`azure-foundry-websearch`](./azure-foundry-websearch) | Real-time web search via Azure AI Foundry's Responses API with Grounding with Bing. |
 | [`spotify`](./spotify) | Controls Spotify playback from the CLI (requires Spotify Premium). |
 
 ## Install
